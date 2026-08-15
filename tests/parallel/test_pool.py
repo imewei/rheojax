@@ -22,6 +22,14 @@ def _raise_error(x):
     raise ValueError(f"intentional error: {x}")
 
 
+def _die_hard(x):
+    """Simulate a worker crash (segfault, OOM-kill) -- no Python exception,
+    the process just disappears."""
+    import os
+
+    os._exit(1)  # noqa: SLF001
+
+
 class TestPersistentProcessPool:
     """Test persistent process pool lifecycle and task execution."""
 
@@ -244,6 +252,37 @@ class TestPersistentProcessPool:
         with PersistentProcessPool(n_workers=2) as pool:
             results = list(pool.map(_add_one, range(5), timeout=10))
             assert sorted(results) == [1, 2, 3, 4, 5]  # nosec B101
+
+    def test_worker_crash_poisons_future_and_respawns(self):
+        """A worker that dies outright (segfault/OOM-kill, no Python
+        exception) must not leave its future hanging under the default
+        timeout=None, and the pool must recover to serve subsequent
+        submissions rather than silently running below capacity forever."""
+        from rheojax.parallel.pool import PersistentProcessPool
+
+        pool = PersistentProcessPool(n_workers=2)
+        try:
+            future = pool.submit(_die_hard, 1)
+            with pytest.raises(RuntimeError, match="crashed"):
+                future.result(timeout=15)
+
+            # The dead slot must have been respawned -- confirm the pool
+            # still completes tasks at full capacity, not just via the
+            # one worker that never crashed.
+            deadline = time.time() + 10.0
+            last_exc: Exception | None = None
+            while time.time() < deadline:
+                try:
+                    result = pool.submit(_add_one, 41).result(timeout=10)
+                    assert result == 42  # nosec B101
+                    break
+                except Exception as e:  # replacement worker still starting
+                    last_exc = e
+                    time.sleep(0.2)
+            else:
+                raise AssertionError(f"pool never recovered after crash: {last_exc}")
+        finally:
+            pool.shutdown()
 
     def test_shutdown_poisons_pending_futures(self):
         """Futures submitted but not completed before shutdown get an error."""

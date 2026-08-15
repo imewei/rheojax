@@ -41,6 +41,8 @@ configure(n_workers=4, warm_pool=True)
 - `tests/parallel/`（8 个文件）：`test_api`, `test_pool`, `test_config`, `test_warmup`, `test_integration`, `test_imports`，`conftest.py` 提供并行相关 fixture。
 - 与 `pipeline`/`models` 的并行集成分别在 `tests/pipeline/test_batch_parallel.py`, `test_mastercurve_parallel.py`, `test_model_comparison_parallel.py` 中验证。
 
+**注意（2026-08-15 核实）**：`ModelComparisonPipeline._run_parallel()` 直接调用 `PersistentProcessPool`（CPU 密集拟合）。但 `BatchPipeline._parallel_preload()` 与 `MastercurvePipeline._load_datasets_parallel()` 各自内联实现了功能上近似的 `ThreadPoolExecutor` I/O 加载逻辑，**并未**委托给本模块的 `parallel_load()`（三处错误处理语义不同——`parallel_load()` 遇错即抛，另两处按文件收集 `(path, data, error)` 结果——因此不能直接替换）。`parallel_load()`/`parallel_map()` 便捷函数目前仅被测试直接调用。
+
 ## 常见问题 (FAQ)
 
 - **GUI/notebook 环境中并行卡死？** 优先检查是否需要 `RHEOJAX_SEQUENTIAL=1` 或 `RHEOJAX_WORKER_ISOLATION=thread`（子进程在某些交互环境下可能与事件循环冲突）。

@@ -7,7 +7,6 @@ All settings overridable via environment variables or configure() API.
 from __future__ import annotations
 
 import logging
-import multiprocessing
 import os
 import threading
 from typing import Any
@@ -34,6 +33,21 @@ _THREAD_ENV_VARS = (
 )
 
 
+def _available_cpu_count() -> int:
+    """Host CPU count, honoring cgroup/container CPU affinity when available.
+
+    ``os.cpu_count()`` reports the physical host's core count even inside a
+    CPU-quota-limited container (Docker ``--cpus``, k8s ``resources.limits.cpu``),
+    which over-caps worker/thread sizing there. ``os.sched_getaffinity(0)``
+    (Linux only) reports the cgroup-restricted set instead; fall back to
+    ``os.cpu_count()`` on platforms without it (macOS, Windows).
+    """
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return os.cpu_count() or 1
+
+
 def cap_thread_env_vars(n_workers: int) -> None:
     """Cap BLAS/XLA thread counts to a fair per-worker share.
 
@@ -42,7 +56,7 @@ def cap_thread_env_vars(n_workers: int) -> None:
     Uses setdefault() so an explicit caller/environment override wins.
     Call this before any BLAS/JAX import in the target process/thread.
     """
-    threads_per_worker = str(max(1, (os.cpu_count() or 1) // max(1, n_workers)))
+    threads_per_worker = str(max(1, _available_cpu_count() // max(1, n_workers)))
     resolved = {}
     for var in _THREAD_ENV_VARS:
         os.environ.setdefault(var, threads_per_worker)
@@ -81,11 +95,26 @@ def get_default_workers() -> int:
                 env_val,
             )
 
-    cpu_count = multiprocessing.cpu_count() or 1
+    cpu_count = _available_cpu_count()
 
     # GPU-aware: each worker needs ~2GB GPU RAM.
-    # SYS-04: Cache the device-count query — jax.devices() triggers JAX
-    # initialisation and is expensive when called on every invocation.
+    gpu_count = get_gpu_count()
+
+    if gpu_count > 0:
+        return min(gpu_count, cpu_count, 4)
+
+    # CPU: half of cores, min 1, max 8 for practical memory limits
+    return max(1, min(cpu_count // 2, 8))
+
+
+def get_gpu_count() -> int:
+    """Number of non-CPU JAX devices visible to this process.
+
+    SYS-04: Cache the device-count query — jax.devices() triggers JAX
+    initialisation and is expensive when called on every invocation.
+    Shared by get_default_workers() (sizing) and PersistentProcessPool
+    (per-worker CUDA_VISIBLE_DEVICES pinning).
+    """
     global _cached_gpu_count
     with _gpu_count_lock:
         if _cached_gpu_count is None:
@@ -100,13 +129,7 @@ def get_default_workers() -> int:
                 # RuntimeError: JAX initialization failed
                 # AttributeError: API mismatch
                 _cached_gpu_count = 0
-        gpu_count = _cached_gpu_count
-
-    if gpu_count > 0:
-        return min(gpu_count, cpu_count, 4)
-
-    # CPU: half of cores, min 1, max 8 for practical memory limits
-    return max(1, min(cpu_count // 2, 8))
+        return _cached_gpu_count
 
 
 def is_sequential_mode() -> bool:

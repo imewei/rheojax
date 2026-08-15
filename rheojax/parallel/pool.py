@@ -10,6 +10,7 @@ from __future__ import annotations
 import atexit
 import logging
 import multiprocessing as mp
+import os
 import pickle  # noqa: S403  # nosec B403
 import threading
 import traceback
@@ -17,7 +18,11 @@ import weakref
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
-from rheojax.parallel.config import cap_thread_env_vars, get_default_workers
+from rheojax.parallel.config import (
+    cap_thread_env_vars,
+    get_default_workers,
+    get_gpu_count,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +58,30 @@ def _warmup_jax(_unused=None):
     return True
 
 
+def _pin_worker_gpu(worker_id: int, gpu_count: int) -> None:
+    """Pin this worker subprocess to a single GPU device.
+
+    Without this, every worker inherits the parent's CUDA_VISIBLE_DEVICES
+    (all GPUs) and independently XLA-preallocates a large fraction of every
+    visible device's memory, so on a multi-GPU host with n_workers > 1 the
+    second worker to initialize is likely to hit a CUDA OOM -- and the
+    extra GPUs are never actually used for parallelism, defeating the
+    GPU-aware worker count in get_default_workers(). Respects an explicit
+    CUDA_VISIBLE_DEVICES already set by the user/environment. Must run
+    before any JAX/BLAS import in this fresh subprocess.
+    """
+    if gpu_count <= 1 or "CUDA_VISIBLE_DEVICES" in os.environ:
+        return
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(worker_id % gpu_count)
+
+
 def _worker_loop(
     task_queue: mp.Queue,
     result_queue: mp.Queue,
     worker_id: int,
     shutdown_sentinel: object,
     n_workers: int,
+    gpu_count: int = 0,
 ) -> None:
     """Worker main loop — runs in a subprocess.
 
@@ -71,6 +94,8 @@ def _worker_loop(
     Sends (task_id, "ok", result) or (task_id, "error", error_str) to result_queue.
     Exits when it receives the shutdown sentinel.
     """
+    # Must run before any JAX/BLAS import in this fresh subprocess.
+    _pin_worker_gpu(worker_id, gpu_count)
     # Each worker is a separate process; without a cap, every worker's
     # BLAS/XLA backend sizes its thread pool to the full host core count,
     # so n_workers processes oversubscribe the host by ~n_workers x. This
@@ -144,6 +169,7 @@ def _collect_results(pool_ref: weakref.ref) -> None:
         pool = pool_ref()
         if pool is None or pool._shutdown:
             return
+        pool._check_worker_health()
         result_queue = pool._result_queue
         del pool  # Drop the strong ref before blocking on queue.get().
 
@@ -235,22 +261,14 @@ class PersistentProcessPool:
         self._lock = threading.Lock()
         self._shutdown = False
         self._result_thread: threading.Thread | None = None
+        # get_gpu_count() is queried once here (parent process) and threaded
+        # through to each worker for CUDA_VISIBLE_DEVICES pinning -- workers
+        # can't cheaply query it themselves without an unpinned JAX import.
+        self._gpu_count = get_gpu_count()
 
         # Spawn workers
         for i in range(self._n_workers):
-            p = self._ctx.Process(
-                target=_worker_loop,
-                args=(
-                    self._task_queue,
-                    self._result_queue,
-                    i,
-                    self._shutdown_sentinel,
-                    self._n_workers,
-                ),
-                daemon=True,
-            )
-            p.start()
-            self._workers.append(p)
+            self._workers.append(self._spawn_worker(i))
 
         # Start result collector thread. Pass a weakref, not a bound method:
         # threading.Thread(target=self._collect_results) would make the
@@ -292,6 +310,66 @@ class PersistentProcessPool:
     def is_alive(self) -> bool:
         """Check if any worker processes are still running."""
         return any(p.is_alive() for p in self._workers)
+
+    def _spawn_worker(self, worker_id: int) -> mp.process.BaseProcess:
+        """Start (or restart) the worker process for a given slot index."""
+        p = self._ctx.Process(
+            target=_worker_loop,
+            args=(
+                self._task_queue,
+                self._result_queue,
+                worker_id,
+                self._shutdown_sentinel,
+                self._n_workers,
+                self._gpu_count,
+            ),
+            daemon=True,
+        )
+        p.start()
+        return p
+
+    def _check_worker_health(self) -> None:
+        """Detect crashed workers, poison pending futures, and respawn.
+
+        Workers pull tasks from a single shared queue, so a crashed worker
+        cannot be mapped back to the specific task it was running --
+        poisoning every currently pending future (rather than leaving them
+        to hang indefinitely under the default timeout=None) is the safest
+        recoverable behavior without adding a per-task acknowledgement
+        protocol. Replacement workers are spawned so the pool stays at
+        capacity for subsequent submissions.
+        """
+        with self._lock:
+            if self._shutdown:
+                return
+            # Replacement happens synchronously below (same critical section),
+            # so a slot's dead process object is never left in self._workers
+            # across two health-check cycles -- no separate "already handled"
+            # bookkeeping is needed to avoid re-detecting the same crash.
+            dead = [i for i, p in enumerate(self._workers) if not p.is_alive()]
+            if not dead:
+                return
+
+            for i in dead:
+                p = self._workers[i]
+                logger.error(
+                    "Worker %d (pid=%s) died unexpectedly (exitcode=%s); "
+                    "respawning and failing pending tasks",
+                    i,
+                    p.pid,
+                    p.exitcode,
+                )
+
+            pending = [f for f in self._futures.values() if not f.done()]
+            for future in pending:
+                future._set_error(
+                    "A worker process crashed; this task's outcome is "
+                    "unknown (shared task queue cannot attribute it to the "
+                    "dead worker). Resubmit the task if needed."
+                )
+
+            for i in dead:
+                self._workers[i] = self._spawn_worker(i)
 
     def submit(
         self,
