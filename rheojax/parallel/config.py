@@ -34,17 +34,23 @@ _THREAD_ENV_VARS = (
 
 
 def _available_cpu_count() -> int:
-    """Host CPU count, honoring cgroup/container CPU affinity when available.
+    """Host CPU count, honoring CPU affinity restrictions when available.
 
-    ``os.cpu_count()`` reports the physical host's core count even inside a
-    CPU-quota-limited container (Docker ``--cpus``, k8s ``resources.limits.cpu``),
-    which over-caps worker/thread sizing there. ``os.sched_getaffinity(0)``
-    (Linux only) reports the cgroup-restricted set instead; fall back to
-    ``os.cpu_count()`` on platforms without it (macOS, Windows).
+    ``os.cpu_count()`` reports the physical host's core count even when
+    this process is pinned to a subset of cores (``taskset``,
+    ``--cpuset-cpus``, Kubernetes' static CPU-manager policy on Guaranteed
+    pods), which over-caps worker/thread sizing there.
+    ``os.sched_getaffinity(0)`` (Linux only) reports the affinity-restricted
+    set instead; fall back to ``os.cpu_count()`` on platforms without it
+    (macOS, Windows) or if the call itself is unsupported in this sandbox.
+    Note this does NOT reflect CFS-quota-based limits (Docker ``--cpus``,
+    k8s ``resources.limits.cpu`` without an exclusive-core policy) --
+    those throttle scheduling without restricting affinity, so this still
+    returns the full core count under a pure CPU quota.
     """
     try:
         return len(os.sched_getaffinity(0))
-    except AttributeError:
+    except (AttributeError, OSError):
         return os.cpu_count() or 1
 
 

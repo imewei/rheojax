@@ -61,16 +61,28 @@ def _warmup_jax(_unused=None):
 def _pin_worker_gpu(worker_id: int, gpu_count: int) -> None:
     """Pin this worker subprocess to a single GPU device.
 
-    Without this, every worker inherits the parent's CUDA_VISIBLE_DEVICES
-    (all GPUs) and independently XLA-preallocates a large fraction of every
-    visible device's memory, so on a multi-GPU host with n_workers > 1 the
-    second worker to initialize is likely to hit a CUDA OOM -- and the
-    extra GPUs are never actually used for parallelism, defeating the
-    GPU-aware worker count in get_default_workers(). Respects an explicit
-    CUDA_VISIBLE_DEVICES already set by the user/environment. Must run
+    Without this, every worker independently XLA-preallocates a large
+    fraction of every GPU device it can see, so on a multi-GPU host with
+    n_workers > 1 the second worker to initialize is likely to hit a CUDA
+    OOM -- and the extra GPUs are never actually used for parallelism,
+    defeating the GPU-aware worker count in get_default_workers().
+
+    If CUDA_VISIBLE_DEVICES is already set (e.g. by a SLURM/Kubernetes GPU
+    allocation on the *parent* process, which every spawned worker inherits
+    unchanged), partition that inherited list across workers by index
+    instead of leaving it untouched -- otherwise every worker would still
+    see and preallocate on the whole allocation, silently defeating pinning
+    on exactly the managed-cluster hosts this exists to protect. Must run
     before any JAX/BLAS import in this fresh subprocess.
     """
-    if gpu_count <= 1 or "CUDA_VISIBLE_DEVICES" in os.environ:
+    preset = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if preset is not None:
+        devices = [d.strip() for d in preset.split(",") if d.strip()]
+        if len(devices) <= 1:
+            return  # Already a single device (or unparseable) -- nothing to partition.
+        os.environ["CUDA_VISIBLE_DEVICES"] = devices[worker_id % len(devices)]
+        return
+    if gpu_count <= 1:
         return
     os.environ["CUDA_VISIBLE_DEVICES"] = str(worker_id % gpu_count)
 
@@ -81,7 +93,7 @@ def _worker_loop(
     worker_id: int,
     shutdown_sentinel: object,
     n_workers: int,
-    gpu_count: int = 0,
+    gpu_count: int,
 ) -> None:
     """Worker main loop — runs in a subprocess.
 
@@ -94,12 +106,8 @@ def _worker_loop(
     Sends (task_id, "ok", result) or (task_id, "error", error_str) to result_queue.
     Exits when it receives the shutdown sentinel.
     """
-    # Must run before any JAX/BLAS import in this fresh subprocess.
+    # Both must run before any JAX/BLAS import in this fresh subprocess.
     _pin_worker_gpu(worker_id, gpu_count)
-    # Each worker is a separate process; without a cap, every worker's
-    # BLAS/XLA backend sizes its thread pool to the full host core count,
-    # so n_workers processes oversubscribe the host by ~n_workers x. This
-    # must run before any JAX/BLAS import in this fresh subprocess.
     cap_thread_env_vars(n_workers)
 
     while True:
@@ -162,6 +170,11 @@ def _collect_results(pool_ref: weakref.ref) -> None:
     so 1 Hz polling adds negligible latency while cutting thread wake-ups
     by 10x.  shutdown() joins this thread with a 1.0s budget, which is
     already accounted for in the existing join timeout.
+
+    Also runs pool._check_worker_health() once per iteration: this is the
+    only thread that owns result routing, so it doubles as the crash
+    detector -- a dead worker's in-flight task will never produce a
+    result, and this loop is what would otherwise wait on it forever.
     """
     import queue as _queue
 
@@ -169,7 +182,15 @@ def _collect_results(pool_ref: weakref.ref) -> None:
         pool = pool_ref()
         if pool is None or pool._shutdown:
             return
-        pool._check_worker_health()
+        try:
+            pool._check_worker_health()
+        except Exception:
+            # A failed respawn (e.g. OSError from resource exhaustion,
+            # plausible right after an OOM-killed worker) must not kill
+            # this thread -- it is the sole consumer of result_queue, so
+            # losing it would silently stop ALL result delivery for the
+            # pool's remaining lifetime, not just future health checks.
+            logger.exception("Worker health check failed; will retry")
         result_queue = pool._result_queue
         del pool  # Drop the strong ref before blocking on queue.get().
 
@@ -264,7 +285,31 @@ class PersistentProcessPool:
         # get_gpu_count() is queried once here (parent process) and threaded
         # through to each worker for CUDA_VISIBLE_DEVICES pinning -- workers
         # can't cheaply query it themselves without an unpinned JAX import.
-        self._gpu_count = get_gpu_count()
+        # Skipped entirely for n_workers<=1 (pinning is a no-op there
+        # anyway, since there's nothing to partition across): calling it
+        # unconditionally would force JAX/CUDA backend init -- and, under
+        # JAX's default preallocation, an unpinned chunk of every visible
+        # GPU's memory -- in the parent process on every construction,
+        # working against the very fix this exists to deliver, and
+        # breaking this module's declared lazy-import design.
+        self._gpu_count = get_gpu_count() if self._n_workers > 1 else 0
+        if (
+            n_workers is not None
+            and self._gpu_count > 0
+            and self._n_workers > self._gpu_count
+        ):
+            # get_default_workers() caps at gpu_count for exactly this
+            # reason; an explicit n_workers= bypasses that cap, so multiple
+            # workers will share (and each independently preallocate on)
+            # the same GPU. Respect the caller's explicit override -- just
+            # surface the risk instead of silently OOM-ing later.
+            logger.warning(
+                "PersistentProcessPool(n_workers=%d) exceeds the %d visible "
+                "GPU(s); multiple workers will share at least one device "
+                "and may hit a CUDA OOM under XLA's default preallocation.",
+                self._n_workers,
+                self._gpu_count,
+            )
 
         # Spawn workers
         for i in range(self._n_workers):
@@ -338,14 +383,15 @@ class PersistentProcessPool:
         recoverable behavior without adding a per-task acknowledgement
         protocol. Replacement workers are spawned so the pool stays at
         capacity for subsequent submissions.
+
+        _collect_results is this method's only caller, and it is a single
+        background thread, so this method can never re-enter itself --
+        that (not the lock below) is what guarantees a dead process object
+        is never re-detected across two health-check cycles.
         """
         with self._lock:
             if self._shutdown:
                 return
-            # Replacement happens synchronously below (same critical section),
-            # so a slot's dead process object is never left in self._workers
-            # across two health-check cycles -- no separate "already handled"
-            # bookkeeping is needed to avoid re-detecting the same crash.
             dead = [i for i, p in enumerate(self._workers) if not p.is_alive()]
             if not dead:
                 return
@@ -360,16 +406,49 @@ class PersistentProcessPool:
                     p.exitcode,
                 )
 
-            pending = [f for f in self._futures.values() if not f.done()]
-            for future in pending:
-                future._set_error(
-                    "A worker process crashed; this task's outcome is "
-                    "unknown (shared task queue cannot attribute it to the "
-                    "dead worker). Resubmit the task if needed."
-                )
+            # Pop (not just poison) every pending future: the shared queue
+            # can't tell us which one the dead worker was running, so the
+            # blast radius can't be narrowed -- but leaving a poisoned
+            # future in self._futures would let a late "ok" result from a
+            # surviving worker call _set_result() on top of an already-set
+            # _error, which result() checks first (PoolFuture.result()),
+            # permanently masking a real success behind a stale crash
+            # message. Popping means a late result instead falls into
+            # _collect_results's existing "unknown task_id" warning path
+            # -- discarded, but observable, never silently corrupted.
+            for task_id, future in list(self._futures.items()):
+                if not future.done():
+                    future._set_error(
+                        "A worker process crashed; this task's outcome is "
+                        "unknown (shared task queue cannot attribute it to "
+                        "the dead worker). Resubmit the task if needed."
+                    )
+                    del self._futures[task_id]
 
-            for i in dead:
-                self._workers[i] = self._spawn_worker(i)
+        # Spawn replacements outside the lock: Process.start() under the
+        # spawn context re-imports this interpreter (JAX-heavy workers can
+        # take hundreds of ms to seconds), and submit() needs this same
+        # lock -- holding it across start() would stall every concurrent
+        # submit() for the full respawn duration.
+        replacements = {i: self._spawn_worker(i) for i in dead}
+
+        with self._lock:
+            if self._shutdown:
+                # shutdown() ran while we were spawning outside the lock --
+                # it already terminated the dead entries it saw; kill these
+                # orphaned replacements rather than installing workers a
+                # concurrent shutdown never had a chance to tear down.
+                # mypy narrows self._shutdown as still-False from the check
+                # above and flags this branch unreachable; it can't model
+                # that another thread's shutdown() mutates it in between.
+                for p in replacements.values():  # type: ignore[unreachable]
+                    try:
+                        p.kill()
+                    except (OSError, ValueError):
+                        pass
+                return
+            for i, p in replacements.items():
+                self._workers[i] = p
 
     def submit(
         self,
@@ -425,7 +504,15 @@ class PersistentProcessPool:
         items: Iterable,
         timeout: float | None = None,
     ) -> Iterator:
-        """Submit multiple tasks and yield results in order."""
+        """Submit multiple tasks and yield results in order.
+
+        Note: if a worker process crashes outright (segfault, OOM-kill)
+        while any task from this batch is still pending, every pending
+        item's result raises an error -- not just the one the crashed
+        worker was running. A shared task queue can't attribute a crash to
+        a specific task, so the pool can't narrow which items were
+        actually affected; see _check_worker_health().
+        """
         futures = [self.submit(fn, item) for item in items]
         for f in futures:
             yield f.result(timeout=timeout)
