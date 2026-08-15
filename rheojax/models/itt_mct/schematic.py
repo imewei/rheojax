@@ -78,6 +78,24 @@ jax, jnp = safe_import_jax()
 logger = get_logger(__name__)
 
 
+def _default_steady_state_t_max(
+    gamma_dot: float, Gamma: float, gamma_c: float
+) -> float:
+    """Adaptive integration horizon for _compute_steady_state_stress_scipy.
+
+    Uses tau_eff = max(tau_bare, tau_shear) so strain has time to
+    accumulate to O(gamma_c) before the integration window closes at low
+    gamma_dot. Matches compute_adaptive_t_max in _kernels_diffrax.py
+    (min() here previously locked t_max to tau_bare at low gamma_dot,
+    starving strain accumulation and collapsing the yield-stress plateau).
+    """
+    tau_bare = 1.0 / Gamma
+    tau_shear = gamma_c / max(gamma_dot, 1e-10)
+    tau_eff = max(tau_bare, tau_shear)
+    t_max = 50.0 * tau_eff
+    return max(10.0, min(t_max, 1000.0))
+
+
 @ModelRegistry.register(
     "itt_mct_schematic",
     protocols=[
@@ -646,7 +664,7 @@ class ITTMCTSchematic(ITTMCTBase):
                 nan_rates = gamma_dot_nonzero[nan_mask]
                 for j, gd in enumerate(nan_rates):
                     sigma_arr[np.where(nan_mask)[0][j]] = (
-                        self._compute_steady_state_stress(float(gd))
+                        self._compute_steady_state_stress_scipy(float(gd))
                     )
 
             sigma[mask_nonzero] = sigma_arr
@@ -697,11 +715,11 @@ class ITTMCTSchematic(ITTMCTBase):
                     sigma[i] = 0.0
             else:
                 # Integrate to steady state
-                sigma[i] = self._compute_steady_state_stress(gd)
+                sigma[i] = self._compute_steady_state_stress_scipy(gd)
 
         return sigma
 
-    def _compute_steady_state_stress(
+    def _compute_steady_state_stress_scipy(
         self,
         gamma_dot: float,
         t_max: float | None = None,
@@ -754,11 +772,7 @@ class ITTMCTSchematic(ITTMCTBase):
 
         # Adaptive integration time
         if t_max is None:
-            tau_bare = 1.0 / Gamma
-            tau_shear = gamma_c / max(gamma_dot, 1e-10)
-            tau_eff = min(tau_bare, tau_shear)
-            t_max = 50.0 * tau_eff
-            t_max = max(10.0, min(t_max, 500.0))
+            t_max = _default_steady_state_t_max(gamma_dot, Gamma, gamma_c)
 
         # Initial state: [Φ, K₁..K_n, γ, σ_integral]
         state0 = np.zeros(3 + self.n_prony_modes)

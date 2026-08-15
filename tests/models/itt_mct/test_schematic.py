@@ -484,8 +484,83 @@ class TestConstructionValidation:
         )
 
 
+class TestSteadyStateStressRefactor:
+    """t_max bugfix + rename regression coverage (no diffrax variant)."""
+
+    def test_default_t_max_uses_max_not_min(self):
+        """Old formula: min(tau_bare, tau_shear) collapsed the yield plateau
+        at low gamma_dot. New formula: max(tau_bare, tau_shear), matching
+        compute_adaptive_t_max in _kernels_diffrax.py.
+        """
+        from rheojax.models.itt_mct.schematic import _default_steady_state_t_max
+
+        Gamma = 1.0  # tau_bare = 1.0
+        gamma_c = 0.1
+        gamma_dot = 0.001  # tau_shear = 0.1 / 0.001 = 100.0
+
+        t_max = _default_steady_state_t_max(gamma_dot, Gamma, gamma_c)
+
+        # max(1.0, 100.0) * 50 = 5000, clipped to new upper bound 1000.
+        assert t_max == pytest.approx(1000.0)
+
+    def test_default_t_max_respects_lower_bound(self):
+        from rheojax.models.itt_mct.schematic import _default_steady_state_t_max
+
+        Gamma = 1000.0  # tau_bare = 0.001
+        gamma_c = 0.1
+        gamma_dot = 1000.0  # tau_shear = 0.1 / 1000 = 0.0001
+
+        t_max = _default_steady_state_t_max(gamma_dot, Gamma, gamma_c)
+
+        # max(0.001, 0.0001) * 50 = 0.05, clipped up to the 10.0 floor.
+        assert t_max == pytest.approx(10.0)
+
+    def test_compute_steady_state_stress_scipy_exists(self):
+        """The rename landed: the scipy-only method has the new name."""
+        model = ITTMCTSchematic(epsilon=-0.05)
+        assert hasattr(model, "_compute_steady_state_stress_scipy")
+        sigma = model._compute_steady_state_stress_scipy(5.0)
+        assert np.isfinite(sigma)
+        assert sigma > 0.0
+
+    def test_flow_curve_scipy_path_still_works_after_rename(self):
+        """_predict_flow_curve_scipy's call site was updated correctly."""
+        model = ITTMCTSchematic(epsilon=-0.05)
+        gamma_dot = np.array([0.0, 1.0, 10.0, 100.0])
+        sigma = model.predict(gamma_dot, test_mode="flow_curve", use_diffrax=False)
+        assert np.all(np.isfinite(sigma))
+        assert np.all(sigma >= 0.0)
+
+    def test_flow_curve_diffrax_nan_fallback_still_works_after_rename(
+        self, monkeypatch
+    ):
+        """_predict_flow_curve_diffrax's NaN-fallback call site was updated.
+
+        Deterministic (monkeypatched), not glass-state-triggered: a real
+        glass-state input isn't guaranteed to make diffrax fail, which
+        would leave this call site unexercised (see the spec's
+        "Deterministic fallback tests" guidance).
+        """
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=0.05)
+        gamma_dot = np.array([0.0, 1.0, 10.0, 100.0])
+
+        def fake_solve_flow_curve_batch(gamma_dot_array, *args, **kwargs):
+            import jax.numpy as jnp
+
+            return jnp.full(gamma_dot_array.shape, jnp.nan)
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_flow_curve_batch", fake_solve_flow_curve_batch
+        )
+
+        sigma = model.predict(gamma_dot, test_mode="flow_curve", use_diffrax=True)
+        assert np.all(np.isfinite(sigma))
+
+
 class TestSteadyStateStressConvergence:
-    """_compute_steady_state_stress must not silently trust a non-converged solve_ivp."""
+    """_compute_steady_state_stress_scipy must not silently trust a non-converged solve_ivp."""
 
     def test_raises_when_solver_never_converges(self, monkeypatch):
         """If solve_ivp reports success=False on every attempt (LSODA and the
@@ -495,7 +570,7 @@ class TestSteadyStateStressConvergence:
         # Pre-warm the Prony-mode cache with a real (unpatched) solve so the
         # mock below only intercepts the steady-state ODE under test, not
         # the unrelated solve_ivp call inside initialize_prony_modes().
-        model._compute_steady_state_stress(0.5)
+        model._compute_steady_state_stress_scipy(0.5)
 
         class _FailedSol:
             success = False
@@ -509,7 +584,7 @@ class TestSteadyStateStressConvergence:
         )
 
         with pytest.raises(RuntimeError, match="failed to converge"):
-            model._compute_steady_state_stress(1.0)
+            model._compute_steady_state_stress_scipy(1.0)
 
 
 class TestEquilibriumCorrelator:
@@ -592,7 +667,7 @@ class TestFlowCurveScipy:
         model = ITTMCTSchematic(
             epsilon=0.05, decorrelation_form="lorentzian", memory_form="full"
         )
-        sigma = model._compute_steady_state_stress(5.0)
+        sigma = model._compute_steady_state_stress_scipy(5.0)
         assert np.isfinite(sigma)
         assert sigma > 0.0
 
