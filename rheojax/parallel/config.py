@@ -26,6 +26,36 @@ _cached_gpu_count: int | None = None
 _gpu_count_lock = threading.Lock()
 
 
+_THREAD_ENV_VARS = (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+)
+
+
+def cap_thread_env_vars(n_workers: int) -> None:
+    """Cap BLAS/XLA thread counts to a fair per-worker share.
+
+    Without this, each of ``n_workers`` processes sizes its thread pool
+    to the full host core count, oversubscribing the host by ~n_workers x.
+    Uses setdefault() so an explicit caller/environment override wins.
+    Call this before any BLAS/JAX import in the target process/thread.
+    """
+    threads_per_worker = str(max(1, (os.cpu_count() or 1) // max(1, n_workers)))
+    resolved = {}
+    for var in _THREAD_ENV_VARS:
+        os.environ.setdefault(var, threads_per_worker)
+        resolved[var] = os.environ[var]
+    os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false")
+    logger.debug(
+        "Capped worker thread env vars: n_workers=%d, resolved=%s, xla_flags=%r",
+        n_workers,
+        resolved,
+        os.environ["XLA_FLAGS"],
+    )
+
+
 def get_default_workers() -> int:
     """Optimal worker count for the current system.
 

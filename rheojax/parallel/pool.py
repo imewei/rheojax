@@ -10,7 +10,6 @@ from __future__ import annotations
 import atexit
 import logging
 import multiprocessing as mp
-import os
 import pickle  # noqa: S403  # nosec B403
 import threading
 import traceback
@@ -18,7 +17,7 @@ import weakref
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
-from rheojax.parallel.config import get_default_workers
+from rheojax.parallel.config import cap_thread_env_vars, get_default_workers
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +58,7 @@ def _worker_loop(
     result_queue: mp.Queue,
     worker_id: int,
     shutdown_sentinel: object,
-    n_workers: int = 1,
+    n_workers: int,
 ) -> None:
     """Worker main loop — runs in a subprocess.
 
@@ -74,19 +73,9 @@ def _worker_loop(
     """
     # Each worker is a separate process; without a cap, every worker's
     # BLAS/XLA backend sizes its thread pool to the full host core count,
-    # so n_workers processes oversubscribe the host by ~n_workers x. Cap
-    # per-worker threads to a fair share, mirroring tests/conftest.py's
-    # xdist fix. setdefault()/os.environ so an explicit user override wins,
-    # and this runs before any JAX/BLAS import in this fresh subprocess.
-    _threads_per_worker = str(max(1, (os.cpu_count() or 1) // max(1, n_workers)))
-    for _thread_env_var in (
-        "OMP_NUM_THREADS",
-        "OPENBLAS_NUM_THREADS",
-        "MKL_NUM_THREADS",
-        "NUMEXPR_NUM_THREADS",
-    ):
-        os.environ.setdefault(_thread_env_var, _threads_per_worker)
-    os.environ.setdefault("XLA_FLAGS", "--xla_cpu_multi_thread_eigen=false")
+    # so n_workers processes oversubscribe the host by ~n_workers x. This
+    # must run before any JAX/BLAS import in this fresh subprocess.
+    cap_thread_env_vars(n_workers)
 
     while True:
         try:

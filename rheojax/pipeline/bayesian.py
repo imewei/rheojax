@@ -158,18 +158,7 @@ class BayesianPipeline(Pipeline):
             # TypeError since we explicitly pass method="nlsq" below.
             nlsq_kwargs.pop("method", None)
             model_obj.fit(X, y, method="nlsq", **nlsq_kwargs)
-            # Reuse the NLSQ result's r_squared (already computed during
-            # fit) instead of calling score(), which would re-run predict()
-            # a second time. Falls back to score() if unavailable.
-            nlsq_result = (
-                model_obj.get_nlsq_result()
-                if hasattr(model_obj, "get_nlsq_result")
-                else None
-            )
-            if nlsq_result is not None and nlsq_result.r_squared is not None:
-                r_squared = nlsq_result.r_squared
-            else:
-                r_squared = model_obj.score(X, y)
+            r_squared = model_obj.score(X, y)
             ctx["r_squared"] = r_squared
             ctx["n_parameters"] = len(model_obj.parameters)
 

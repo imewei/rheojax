@@ -660,13 +660,21 @@ class BatchPipeline:
                 data_shape=X.shape,
             ) as ctx:
                 # Predict once and derive R²/RMSE from it (avoid calling
-                # model.score(), which would re-run predict() a second time).
+                # model.score(), which would re-run predict() a second
+                # time), matching BaseModel.score()'s formula and
+                # degeneracy guard exactly (rheojax/core/base.py:1047).
+                y_arr = np.asarray(y)
                 y_pred = model.predict(X)
-                residuals = np.asarray(y) - np.asarray(y_pred)
-                y_for_ss = np.abs(y) if np.iscomplexobj(y) else y
+                residuals = y_arr - np.asarray(y_pred)
                 ss_res = float(np.sum(np.abs(residuals) ** 2))
-                ss_tot = float(np.sum((y_for_ss - np.mean(y_for_ss)) ** 2))
-                metrics["r_squared"] = (1 - ss_res / ss_tot) if ss_tot > 0 else 0.0
+                ss_tot = float(np.sum(np.abs(y_arr - np.mean(y_arr)) ** 2))
+                eps = np.finfo(float).eps
+                scale = max(1.0, float(np.max(np.abs(y_arr))))
+                if ss_tot == 0 or abs(ss_tot) < eps * scale**2:
+                    metrics["r_squared"] = float("nan")
+                else:
+                    r2 = 1 - (ss_res / ss_tot)
+                    metrics["r_squared"] = float("nan") if np.isnan(r2) else r2
                 metrics["parameters"] = model.get_params()
                 metrics["model"] = model.__class__.__name__
 

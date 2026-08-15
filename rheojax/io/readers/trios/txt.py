@@ -1212,6 +1212,18 @@ def _process_remaining_rows(
         assert y_units2_orig is not None  # noqa: S101 (guarded by caller)
         factor_real = float(convert_units(1.0, y_units_orig, y_units))
         factor_imag = float(convert_units(1.0, y_units2_orig, y_units))
+        # A bad unit-table entry would otherwise silently zero/sign-flip
+        # every row of the segment instead of failing at the source.
+        if not (math.isfinite(factor_real) and factor_real > 0):
+            raise ValueError(
+                f"Invalid unit conversion factor for {y_units_orig!r} -> "
+                f"{y_units!r}: {factor_real}"
+            )
+        if not (math.isfinite(factor_imag) and factor_imag > 0):
+            raise ValueError(
+                f"Invalid unit conversion factor for {y_units2_orig!r} -> "
+                f"{y_units!r}: {factor_imag}"
+            )
     else:
         factor_real = 1.0
         factor_imag = 1.0

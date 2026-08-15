@@ -1085,19 +1085,7 @@ class Pipeline(_PipelineIO, _PipelinePlotting):
                 self._last_fit_result = None  # Lazily built by get_fit_result()
                 self.steps.append(("fit", model_obj))
                 try:
-                    # Reuse the NLSQ result's r_squared (already computed
-                    # during fit) instead of calling score(), which would
-                    # re-run predict() a second time. Falls back to score()
-                    # when no NLSQ result is available (e.g. non-NLSQ fits).
-                    nlsq_result = (
-                        model_obj.get_nlsq_result()
-                        if hasattr(model_obj, "get_nlsq_result")
-                        else None
-                    )
-                    if nlsq_result is not None and nlsq_result.r_squared is not None:
-                        score = nlsq_result.r_squared
-                    else:
-                        score = model_obj.score(X, y)
+                    score = model_obj.score(X, y)
                 except Exception:
                     score = float("nan")
                 ctx["r_squared"] = score

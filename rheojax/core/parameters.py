@@ -1396,6 +1396,11 @@ class ParameterOptimizer:
         self.objective: Callable | None = None
         self.constraints: list[Callable] = []
         self.callback: Callable | None = None
+        # Cache for the traced jax.grad() function in compute_gradient(),
+        # keyed by self.objective identity so a stale cache is detected
+        # by an `is not` check rather than a string-keyed getattr().
+        self._grad_fn: Callable | None = None
+        self._grad_fn_objective: Callable | None = None
         logger.debug(
             "ParameterOptimizer created",
             num_params=len(parameters),
@@ -1492,7 +1497,7 @@ class ParameterOptimizer:
             # JAX automatic differentiation. Cache the traced gradient
             # function keyed by self.objective identity so repeated calls
             # don't re-trace/re-JIT on every invocation.
-            if getattr(self, "_grad_fn_objective", None) is not self.objective:
+            if self._grad_fn is None or self._grad_fn_objective is not self.objective:
                 self._grad_fn = jax.grad(self.objective)
                 self._grad_fn_objective = self.objective
             return np.array(self._grad_fn(jnp.array(values)))
