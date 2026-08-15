@@ -61,6 +61,7 @@ try:
     from rheojax.models.itt_mct._kernels_diffrax import (
         is_diffrax_available,
         precompile_flow_curve_solver,
+        solve_equilibrium_correlator_trajectory,
         solve_flow_curve_batch,
     )
 
@@ -388,6 +389,55 @@ class ITTMCTSchematic(ITTMCTBase):
         return (1.0 + s) ** 2
 
     def _compute_equilibrium_correlator(
+        self,
+        t: jnp.ndarray,
+        use_diffrax: bool | None = None,
+    ) -> jnp.ndarray:
+        """Compute equilibrium (quiescent) correlator Phi_eq(t).
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure. See _compute_equilibrium_correlator_scipy
+        and _compute_equilibrium_correlator_diffrax for the two backends.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._compute_equilibrium_correlator_diffrax(t)
+        return self._compute_equilibrium_correlator_scipy(t)
+
+    def _compute_equilibrium_correlator_diffrax(
+        self,
+        t: jnp.ndarray,
+    ) -> jnp.ndarray:
+        """Fast equilibrium correlator using diffrax. Falls back to scipy
+        (whole-call retry) if the diffrax solve fails."""
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+
+        t_arr = jnp.asarray(t)
+        t_max = float(jnp.max(t_arr))
+
+        if self._prony_amplitudes is None:
+            tau_modes = np.logspace(-3, np.log10(t_max), self.n_prony_modes)
+            g_modes = tau_modes ** (-0.3)
+            g_modes /= g_modes.sum()
+            self._prony_amplitudes = g_modes
+            self._prony_times = tau_modes
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        phi = solve_equilibrium_correlator_trajectory(
+            t_arr, v1, v2, Gamma, g, tau, self.n_prony_modes
+        )
+
+        if np.any(np.isnan(np.array(phi))):
+            return self._compute_equilibrium_correlator_scipy(t)
+
+        return phi
+
+    def _compute_equilibrium_correlator_scipy(
         self,
         t: jnp.ndarray,
     ) -> jnp.ndarray:
@@ -858,6 +908,7 @@ class ITTMCTSchematic(ITTMCTBase):
         self,
         omega: np.ndarray,
         return_components: bool = False,
+        use_diffrax: bool | None = None,
         **kwargs,
     ) -> np.ndarray:
         """Predict linear viscoelastic moduli G*(ω).
@@ -892,7 +943,9 @@ class ITTMCTSchematic(ITTMCTBase):
         t = np.logspace(-4, np.log10(t_max), 2000)
 
         # Compute equilibrium correlator (uses refined Prony modes)
-        phi_eq = np.array(self._compute_equilibrium_correlator(jnp.array(t)))
+        phi_eq = np.array(
+            self._compute_equilibrium_correlator(jnp.array(t), use_diffrax=use_diffrax)
+        )
 
         # Compute G*(ω) via Fourier transform
         G_prime, G_double_prime = compute_complex_modulus_from_correlator(

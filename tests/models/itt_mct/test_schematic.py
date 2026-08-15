@@ -10,7 +10,10 @@ Tests cover:
 import numpy as np
 import pytest
 
+from rheojax.core.jax_config import safe_import_jax
 from rheojax.models.itt_mct import ITTMCTSchematic
+
+jax, jnp = safe_import_jax()
 
 
 class TestITTMCTSchematicInitialization:
@@ -617,6 +620,89 @@ class TestEquilibriumCorrelator:
             )
         )
         assert glass[-1] >= fluid[-1]
+
+
+@pytest.mark.slow
+class TestEquilibriumCorrelatorDiffrax:
+    """Diffrax equilibrium-correlator path (first call triggers JIT).
+
+    Note on the TDD red step: `_compute_equilibrium_correlator` currently
+    takes only `self, t` (no `**kwargs`), so every test below that passes
+    `use_diffrax=...` genuinely raises `TypeError` until Step 10 adds the
+    parameter -- a real red step, unlike `_predict_oscillation` below
+    (which already has `**kwargs` and needs a different check; see
+    `test_predict_oscillation_accepts_use_diffrax`).
+    """
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = jnp.logspace(-2, 2, 30)
+
+        phi_scipy = model._compute_equilibrium_correlator(t, use_diffrax=False)
+        phi_diffrax = model._compute_equilibrium_correlator(t, use_diffrax=True)
+
+        np.testing.assert_allclose(
+            np.array(phi_diffrax), np.array(phi_scipy), rtol=1e-3, atol=1e-6
+        )
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = jnp.logspace(-2, 2, 20)
+        phi_default = model._compute_equilibrium_correlator(t)
+        phi_explicit = model._compute_equilibrium_correlator(t, use_diffrax=True)
+        np.testing.assert_allclose(np.array(phi_default), np.array(phi_explicit))
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        """Deterministic fallback test: force the diffrax helper to
+        return NaN and assert the scipy path is used instead (not a
+        glass-state test, which isn't guaranteed to trigger a failure).
+        """
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = jnp.logspace(-2, 2, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_equilibrium_correlator_trajectory", fake_solve
+        )
+
+        phi = model._compute_equilibrium_correlator(t, use_diffrax=True)
+
+        assert np.all(np.isfinite(np.array(phi)))
+
+    def test_predict_oscillation_accepts_use_diffrax(self):
+        """Genuine TDD red step for the oscillation forwarding: unlike
+        _compute_equilibrium_correlator (no **kwargs), _predict_oscillation
+        already accepts **kwargs today, so calling it with use_diffrax=...
+        does NOT raise before Step 11 -- it silently swallows the kwarg
+        and both backends end up computing via whatever
+        _compute_equilibrium_correlator's own default resolves to, making
+        a naive before/after parity assertion pass even without Step 11.
+        Assert the signature explicitly instead."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=0.05)
+        assert "use_diffrax" in inspect.signature(model._predict_oscillation).parameters
+
+    def test_oscillation_speedup_side_effect_still_correct(self):
+        """_predict_oscillation depends on _compute_equilibrium_correlator
+        internally — confirm its output is unaffected by the diffrax path
+        existing (dispatch defaults to diffrax, but physics must match)."""
+        model_scipy = ITTMCTSchematic(epsilon=0.05)
+        model_diffrax = ITTMCTSchematic(epsilon=0.05)
+        omega = np.logspace(-2, 2, 15)
+
+        G_star_scipy = model_scipy._predict_oscillation(
+            omega, use_diffrax=False, return_components=True
+        )
+        G_star_diffrax = model_diffrax._predict_oscillation(
+            omega, use_diffrax=True, return_components=True
+        )
+
+        np.testing.assert_allclose(G_star_diffrax, G_star_scipy, rtol=1e-3, atol=1e-6)
 
 
 class TestFlowCurveScipy:
