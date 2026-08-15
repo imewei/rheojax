@@ -39,6 +39,7 @@ from rheojax.logging import get_logger
 from rheojax.models.itt_mct._kernels import (
     f12_equilibrium_correlator_rhs,
     f12_volterra_creep_rhs,
+    f12_volterra_laos_rhs,
     f12_volterra_relaxation_rhs,
     f12_volterra_startup_rhs,
     strain_decorrelation,
@@ -993,6 +994,98 @@ def solve_flow_curve_batch(
 
     # Run batched solve
     return solver(gamma_dot_array, v1, v2, Gamma, gamma_c, G_inf, g, tau)
+
+
+class LaosParams(NamedTuple):
+    """Parameters for LAOS ODE integration."""
+
+    gamma_0: float
+    omega: float
+    v1: float
+    v2: float
+    Gamma: float
+    gamma_c: float
+    G_inf: float
+    g: jnp.ndarray
+    tau: jnp.ndarray
+
+
+def make_laos_vector_field(
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+) -> Callable:
+    """Diffrax-compatible vector field for LAOS, reusing
+    f12_volterra_laos_rhs unchanged. The oscillatory driving
+    (gamma_0 * sin(omega * t)) is already explicit in the RHS's t
+    argument -- diffrax handles it natively, no special-casing needed."""
+
+    def vector_field(t: float, state: jnp.ndarray, args: LaosParams) -> jnp.ndarray:
+        return f12_volterra_laos_rhs(
+            state,
+            t,
+            args.gamma_0,
+            args.omega,
+            args.v1,
+            args.v2,
+            args.Gamma,
+            args.gamma_c,
+            args.G_inf,
+            args.g,
+            args.tau,
+            n_modes,
+            use_lorentzian,
+            memory_form=memory_form,
+        )
+
+    return vector_field
+
+
+def solve_laos_trajectory(
+    t_array: jnp.ndarray,
+    gamma_0: float,
+    omega: float,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    gamma_c: float,
+    G_inf: float,
+    g: jnp.ndarray,
+    tau: jnp.ndarray,
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+    rtol: float = 1e-6,
+    atol: float = 1e-8,
+    max_steps: int = 65536,
+) -> jnp.ndarray:
+    """Solve LAOS stress response sigma(t) using diffrax.
+
+    State: [Phi, K_1..K_n, gamma_acc, sigma]. Returns sigma(t_array),
+    NaN-filled on failure.
+    """
+    vector_field = make_laos_vector_field(n_modes, use_lorentzian, memory_form)
+    params = LaosParams(
+        gamma_0=gamma_0,
+        omega=omega,
+        v1=v1,
+        v2=v2,
+        Gamma=Gamma,
+        gamma_c=gamma_c,
+        G_inf=G_inf,
+        g=g,
+        tau=tau,
+    )
+
+    state0 = jnp.zeros(3 + n_modes)
+    state0 = state0.at[0].set(1.0)  # Phi(0) = 1
+
+    ys, failed = _solve_trajectory(
+        vector_field, state0, params, jnp.asarray(t_array), rtol, atol, max_steps
+    )
+
+    sigma = ys[:, -1]
+    return jnp.where(failed, jnp.nan, sigma)
 
 
 # =============================================================================

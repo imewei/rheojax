@@ -18,6 +18,7 @@ diffrax = pytest.importorskip("diffrax")
 from rheojax.models.itt_mct._kernels_diffrax import (
     solve_creep_trajectory,
     solve_equilibrium_correlator_trajectory,
+    solve_laos_trajectory,
     solve_relaxation_trajectory,
     solve_startup_trajectory,
 )
@@ -168,3 +169,33 @@ class TestCreepTrajectory:
         elastic_jump = sigma_applied / G_inf
         assert gamma[0] >= elastic_jump * 0.5
         assert gamma[-1] >= gamma[0]
+
+
+class TestLaosTrajectory:
+    def test_oscillatory_stress_response(self):
+        n_modes = 10
+        tau = jnp.logspace(-2, 2, n_modes)
+        g = jnp.ones(n_modes) / n_modes
+        omega = 1.0
+        period = 2.0 * np.pi / omega
+        t = jnp.linspace(0.0, 2 * period, 40)
+
+        sigma = solve_laos_trajectory(
+            t,
+            gamma_0=0.1,
+            omega=omega,
+            v1=0.0,
+            v2=3.0,
+            Gamma=1.0,
+            gamma_c=0.1,
+            G_inf=1e6,
+            g=g,
+            tau=tau,
+            n_modes=n_modes,
+        )
+
+        assert sigma.shape == (40,)
+        assert np.all(np.isfinite(sigma))
+        # Oscillatory driving -> stress must change sign or at least vary
+        # substantially across the two periods (not a flat/frozen output).
+        assert float(jnp.std(sigma)) > 0.0
