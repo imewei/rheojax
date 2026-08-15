@@ -369,6 +369,9 @@ class ITTMCTBase(BaseModel):
             Shear rate array (1/s)
         sigma : np.ndarray
             Steady-state stress array (Pa)
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -424,6 +427,9 @@ class ITTMCTBase(BaseModel):
         G_star : np.ndarray
             Complex modulus. Accepts complex G* = G' + iG'',
             (n, 2) array [G', G''], or 1D real |G*| magnitude.
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -507,6 +513,9 @@ class ITTMCTBase(BaseModel):
             Stress response σ(t) (Pa)
         gamma_dot : float, default 1.0
             Applied shear rate (1/s)
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -567,6 +576,9 @@ class ITTMCTBase(BaseModel):
             Creep compliance J(t) = γ(t)/σ₀ (1/Pa)
         sigma_applied : float, default 1.0
             Applied stress (Pa)
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -627,6 +639,9 @@ class ITTMCTBase(BaseModel):
             Relaxing stress σ(t) (Pa)
         gamma_pre : float, default 0.01
             Pre-shear strain before relaxation
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------
@@ -690,6 +705,9 @@ class ITTMCTBase(BaseModel):
             Strain amplitude
         omega : float, default 1.0
             Angular frequency (rad/s)
+        use_diffrax : bool, optional
+            Force use of diffrax (True) or scipy (False) during fitting.
+            If None (default), uses diffrax when available.
 
         Returns
         -------

@@ -1781,6 +1781,8 @@ class ITTMCTSchematic(ITTMCTBase):
             requested = all_protocols
         elif protocols is None:
             requested = ()
+        elif isinstance(protocols, str):
+            requested = (protocols,)
         else:
             requested = tuple(protocols)
 

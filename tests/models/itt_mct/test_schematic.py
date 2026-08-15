@@ -1190,6 +1190,34 @@ class TestLAOSDiffrax:
         assert np.all(np.isfinite(sigma))
 
 
+class TestVectorFieldFactoryCacheIdentity:
+    """The 5 make_*_vector_field factories are @functools.cache-wrapped
+    so _solve_trajectory's @jax.jit (which treats the closure as a
+    static arg) reuses its compiled trace across calls instead of
+    retracing every call. If that caching is ever accidentally
+    removed, this is the only test that would catch it -- everything
+    else stays correct (just slower), since a fresh closure retraces
+    rather than errors. No diffrax solve is triggered here, so this
+    runs fast even in the smoke tier."""
+
+    def test_factories_return_identical_closure_for_same_config(self):
+        from rheojax.models.itt_mct._kernels_diffrax import (
+            make_creep_vector_field,
+            make_equilibrium_correlator_vector_field,
+            make_laos_vector_field,
+            make_relaxation_vector_field,
+            make_startup_vector_field,
+        )
+
+        assert make_equilibrium_correlator_vector_field(
+            5
+        ) is make_equilibrium_correlator_vector_field(5)
+        assert make_startup_vector_field(5) is make_startup_vector_field(5)
+        assert make_relaxation_vector_field(5) is make_relaxation_vector_field(5)
+        assert make_creep_vector_field(5) is make_creep_vector_field(5)
+        assert make_laos_vector_field(5) is make_laos_vector_field(5)
+
+
 @pytest.mark.slow
 class TestFitUseDiffraxForwarding:
     """model.fit(..., use_diffrax=False) must actually reach _predict_X
@@ -1338,6 +1366,30 @@ class TestPrecompileProtocols:
 
         assert called["startup"] is True
         assert called["creep"] is False
+
+    def test_single_protocol_as_bare_string_not_exploded_into_characters(
+        self, monkeypatch
+    ):
+        """protocols: list[str] | str | None accepts a single protocol
+        name as a bare string per its docstring. tuple("startup") would
+        wrongly explode it into ('s','t','a','r','t','u','p'), raising
+        ValueError("Unknown protocol 's' ...")."""
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        called = {"startup": False}
+
+        def fake_startup_solve(*args, **kwargs):
+            called["startup"] = True
+            return jnp.array([0.0])
+
+        monkeypatch.setattr(
+            schematic_mod, "solve_startup_trajectory", fake_startup_solve
+        )
+
+        model.precompile(protocols="startup")
+
+        assert called["startup"] is True
 
     def test_protocols_all_warms_everything(self, monkeypatch):
         import rheojax.models.itt_mct.schematic as schematic_mod

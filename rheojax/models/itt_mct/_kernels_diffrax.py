@@ -150,6 +150,11 @@ def make_equilibrium_correlator_vector_field(n_modes: int) -> Callable:
     Reuses f12_equilibrium_correlator_rhs unchanged — only the argument
     order changes, from scipy's (state, t, *args) to diffrax's
     (t, state, args).
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring).
     """
 
     def vector_field(
@@ -214,7 +219,12 @@ def make_startup_vector_field(
     memory_form: str = "simplified",
 ) -> Callable:
     """Diffrax-compatible vector field for startup flow, reusing
-    f12_volterra_startup_rhs unchanged."""
+    f12_volterra_startup_rhs unchanged.
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring)."""
 
     def vector_field(t: float, state: jnp.ndarray, args: StartupParams) -> jnp.ndarray:
         return f12_volterra_startup_rhs(
@@ -304,7 +314,12 @@ def make_relaxation_vector_field(
     f12_volterra_relaxation_rhs unchanged. State is [Phi, K_1..K_n, sigma]
     (n+2) -- the sigma slot is solved but never read; the caller
     reconstructs stress algebraically from Phi to avoid a round-off
-    drift-to-negative bug the scipy path is already fixed to avoid."""
+    drift-to-negative bug the scipy path is already fixed to avoid.
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring)."""
 
     def vector_field(
         t: float, state: jnp.ndarray, args: RelaxationParams
@@ -403,7 +418,12 @@ def make_creep_vector_field(
     memory_form: str = "simplified",
 ) -> Callable:
     """Diffrax-compatible vector field for creep compliance, reusing
-    f12_volterra_creep_rhs unchanged."""
+    f12_volterra_creep_rhs unchanged.
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring)."""
 
     def vector_field(t: float, state: jnp.ndarray, args: CreepParams) -> jnp.ndarray:
         return f12_volterra_creep_rhs(
@@ -1031,7 +1051,12 @@ def make_laos_vector_field(
     """Diffrax-compatible vector field for LAOS, reusing
     f12_volterra_laos_rhs unchanged. The oscillatory driving
     (gamma_0 * sin(omega * t)) is already explicit in the RHS's t
-    argument -- diffrax handles it natively, no special-casing needed."""
+    argument -- diffrax handles it natively, no special-casing needed.
+
+    @functools.cache is load-bearing: _solve_trajectory's @jax.jit
+    treats this closure as a static arg, so repeat calls must return
+    the identical object for the compiled trace to be reused instead
+    of retraced (see _solve_trajectory's docstring)."""
 
     def vector_field(t: float, state: jnp.ndarray, args: LaosParams) -> jnp.ndarray:
         return f12_volterra_laos_rhs(
