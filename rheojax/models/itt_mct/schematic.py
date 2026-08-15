@@ -63,6 +63,7 @@ try:
         precompile_flow_curve_solver,
         solve_equilibrium_correlator_trajectory,
         solve_flow_curve_batch,
+        solve_startup_trajectory,
     )
 
     _HAS_DIFFRAX = is_diffrax_available()
@@ -963,6 +964,67 @@ class ITTMCTSchematic(ITTMCTBase):
         return G_prime + 1j * G_double_prime
 
     def _predict_startup(
+        self,
+        t: np.ndarray,
+        gamma_dot: float = 1.0,
+        use_diffrax: bool | None = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """Predict stress growth in startup flow.
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._predict_startup_diffrax(t, gamma_dot)
+        return self._predict_startup_scipy(t, gamma_dot=gamma_dot)
+
+    def _predict_startup_diffrax(
+        self,
+        t: np.ndarray,
+        gamma_dot: float,
+    ) -> np.ndarray:
+        """Fast startup-flow prediction using diffrax. Falls back to
+        scipy (whole-call retry) if the diffrax solve fails."""
+        t = np.asarray(t)
+
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+
+        self._check_prony_cache()
+        if self._prony_amplitudes is None:
+            self.initialize_prony_modes()
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        sigma = solve_startup_trajectory(
+            jnp.asarray(t),
+            gamma_dot,
+            v1,
+            v2,
+            Gamma,
+            gamma_c,
+            G_inf,
+            g,
+            tau,
+            self.n_prony_modes,
+            self._use_lorentzian,
+            memory_form=self._memory_form,
+        )
+
+        sigma_arr = np.array(sigma)
+        if np.any(np.isnan(sigma_arr)):
+            return self._predict_startup_scipy(t, gamma_dot=gamma_dot)
+
+        return sigma_arr
+
+    def _predict_startup_scipy(
         self,
         t: np.ndarray,
         gamma_dot: float = 1.0,

@@ -827,6 +827,57 @@ class TestStartupDetailed:
         assert np.all(np.isfinite(sigma))
 
 
+@pytest.mark.slow
+class TestStartupDiffrax:
+    def test_predict_startup_accepts_use_diffrax(self):
+        """Genuine TDD red step: _predict_startup already accepts **kwargs
+        today, so a bare use_diffrax=... call would silently swallow it
+        (not raise) both before and after the real implementation --
+        assert the signature explicitly instead of relying on a
+        behavioral test to fail for the right reason."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        assert "use_diffrax" in inspect.signature(model._predict_startup).parameters
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 30)
+
+        sigma_scipy = model.predict(
+            t, test_mode="startup", gamma_dot=1.0, use_diffrax=False
+        )
+        sigma_diffrax = model.predict(
+            t, test_mode="startup", gamma_dot=1.0, use_diffrax=True
+        )
+
+        np.testing.assert_allclose(sigma_diffrax, sigma_scipy, rtol=1e-3, atol=1e-6)
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 20)
+        sigma_default = model.predict(t, test_mode="startup", gamma_dot=1.0)
+        sigma_explicit = model.predict(
+            t, test_mode="startup", gamma_dot=1.0, use_diffrax=True
+        )
+        np.testing.assert_allclose(sigma_default, sigma_explicit)
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(schematic_mod, "solve_startup_trajectory", fake_solve)
+
+        sigma = model.predict(t, test_mode="startup", gamma_dot=1.0, use_diffrax=True)
+
+        assert np.all(np.isfinite(sigma))
+
+
 class TestCreepDetailed:
     """Creep compliance: elastic-jump IC and monotonicity."""
 
