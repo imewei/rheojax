@@ -216,6 +216,7 @@ class TestModelComparisonPipeline:
         assert "mock_maxwell" in pipeline.results
         assert "mock_zener" in pipeline.results
 
+    @pytest.mark.smoke
     def test_comparison_metrics(self, relaxation_data):
         """Test that comparison computes metrics."""
         pipeline = ModelComparisonPipeline(["mock_maxwell"])
