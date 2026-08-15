@@ -63,6 +63,7 @@ try:
         precompile_flow_curve_solver,
         solve_equilibrium_correlator_trajectory,
         solve_flow_curve_batch,
+        solve_relaxation_trajectory,
         solve_startup_trajectory,
     )
 
@@ -1198,6 +1199,74 @@ class ITTMCTSchematic(ITTMCTBase):
         return J
 
     def _predict_relaxation(
+        self,
+        t: np.ndarray,
+        gamma_pre: float = 0.01,
+        use_diffrax: bool | None = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """Predict stress relaxation after flow cessation.
+
+        Dispatches to the diffrax fast path when available, falling back
+        to scipy on failure.
+        """
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
+        if should_use_diffrax and _HAS_DIFFRAX:
+            return self._predict_relaxation_diffrax(t, gamma_pre)
+        return self._predict_relaxation_scipy(t, gamma_pre=gamma_pre)
+
+    def _predict_relaxation_diffrax(
+        self,
+        t: np.ndarray,
+        gamma_pre: float,
+    ) -> np.ndarray:
+        """Fast relaxation prediction using diffrax. Falls back to scipy
+        (whole-call retry) if the diffrax solve fails.
+
+        Stress is reconstructed algebraically from the correlator
+        trajectory (sigma = G_inf * gamma_pre * Phi**2), matching the
+        scipy path exactly -- see solve_relaxation_trajectory's docstring
+        for why this must not read an ODE-integrated sigma state.
+        """
+        t = np.asarray(t)
+
+        v1 = self.parameters.get_value("v1")
+        v2 = self.parameters.get_value("v2")
+        Gamma = self.parameters.get_value("Gamma")
+        gamma_c = self.parameters.get_value("gamma_c")
+        G_inf = self.parameters.get_value("G_inf")
+
+        self._check_prony_cache()
+        if self._prony_amplitudes is None:
+            self.initialize_prony_modes()
+
+        g = jnp.array(self._prony_amplitudes)
+        tau = jnp.array(self._prony_times)
+
+        phi = solve_relaxation_trajectory(
+            jnp.asarray(t),
+            gamma_pre,
+            v1,
+            v2,
+            Gamma,
+            gamma_c,
+            G_inf,
+            g,
+            tau,
+            self.n_prony_modes,
+            self._use_lorentzian,
+            memory_form=self._memory_form,
+        )
+
+        phi_arr = np.array(phi)
+        if np.any(np.isnan(phi_arr)):
+            return self._predict_relaxation_scipy(t, gamma_pre=gamma_pre)
+
+        phi_clipped = np.clip(phi_arr, 0.0, 1.0)
+        return G_inf * gamma_pre * phi_clipped * phi_clipped
+
+    def _predict_relaxation_scipy(
         self,
         t: np.ndarray,
         gamma_pre: float = 0.01,

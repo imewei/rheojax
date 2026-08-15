@@ -929,6 +929,76 @@ class TestRelaxationDetailed:
         assert sigma[-1] > 0.0
 
 
+@pytest.mark.slow
+class TestRelaxationDiffrax:
+    def test_predict_relaxation_accepts_use_diffrax(self):
+        """Genuine TDD red step: _predict_relaxation already accepts
+        **kwargs today, so a bare use_diffrax=... call would silently
+        swallow it -- assert the signature explicitly."""
+        import inspect
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        assert "use_diffrax" in inspect.signature(model._predict_relaxation).parameters
+
+    def test_dispatch_default_uses_diffrax_when_available(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 100.0, 20)
+        sigma_default = model.predict(t, test_mode="relaxation", gamma_pre=0.01)
+        sigma_explicit = model.predict(
+            t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=True
+        )
+        np.testing.assert_allclose(sigma_default, sigma_explicit)
+
+    def test_diffrax_matches_scipy_fluid(self):
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 100.0, 30)
+
+        sigma_scipy = model.predict(
+            t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=False
+        )
+        sigma_diffrax = model.predict(
+            t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=True
+        )
+
+        np.testing.assert_allclose(sigma_diffrax, sigma_scipy, rtol=1e-3, atol=1e-6)
+
+    def test_stress_never_negative_glass_and_fluid(self):
+        """Regression guard: the algebraic reconstruction (sigma =
+        G_inf*gamma_pre*clip(phi,0,1)**2) must never go negative, in
+        either backend -- this is exactly the bug the scipy path's
+        algebraic-reconstruction fix already solved."""
+        t = np.logspace(-2, 3, 50)
+        for epsilon in (-0.1, 0.1):
+            model = ITTMCTSchematic(epsilon=epsilon)
+            sigma_scipy = model.predict(
+                t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=False
+            )
+            sigma_diffrax = model.predict(
+                t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=True
+            )
+            assert np.all(sigma_scipy >= 0.0), f"scipy negative at epsilon={epsilon}"
+            assert np.all(sigma_diffrax >= 0.0), (
+                f"diffrax negative at epsilon={epsilon}"
+            )
+
+    def test_nan_fallback_calls_scipy(self, monkeypatch):
+        import rheojax.models.itt_mct.schematic as schematic_mod
+
+        model = ITTMCTSchematic(epsilon=-0.1)
+        t = np.linspace(0.01, 10.0, 10)
+
+        def fake_solve(*args, **kwargs):
+            return jnp.full((len(t),), jnp.nan)
+
+        monkeypatch.setattr(schematic_mod, "solve_relaxation_trajectory", fake_solve)
+
+        sigma = model.predict(
+            t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=True
+        )
+
+        assert np.all(np.isfinite(sigma))
+
+
 class TestLAOSDetailed:
     """LAOS response and harmonic extraction."""
 
