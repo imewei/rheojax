@@ -17,6 +17,7 @@ diffrax = pytest.importorskip("diffrax")
 
 from rheojax.models.itt_mct._kernels_diffrax import (
     solve_equilibrium_correlator_trajectory,
+    solve_startup_trajectory,
 )
 
 # Every test in this file runs an un-mocked diffrax ODE solve (first-call
@@ -57,3 +58,31 @@ class TestEquilibriumCorrelatorTrajectory:
         )
 
         assert phi[0] == pytest.approx(1.0, abs=1e-3)
+
+
+class TestStartupTrajectory:
+    def test_stress_grows_from_zero(self):
+        n_modes = 10
+        tau = jnp.logspace(-2, 2, n_modes)
+        g = jnp.ones(n_modes) / n_modes
+        t = jnp.linspace(0.01, 10.0, 30)
+
+        sigma = solve_startup_trajectory(
+            t,
+            gamma_dot=1.0,
+            v1=0.0,
+            v2=3.0,
+            Gamma=1.0,
+            gamma_c=0.1,
+            G_inf=1e6,
+            g=g,
+            tau=tau,
+            n_modes=n_modes,
+        )
+
+        assert sigma.shape == (30,)
+        assert np.all(np.isfinite(sigma))
+        # Not just "non-decreasing" (an all-zero array would pass that) --
+        # assert real physical growth given G_inf=1e6, gamma_dot=1.0.
+        assert sigma[-1] > 10.0
+        assert sigma[-1] > sigma[0]
