@@ -620,18 +620,18 @@ class ITTMCTSchematic(ITTMCTBase):
         assert gamma_c is not None
         assert G_inf is not None
 
+        # Determine which solver to use
+        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
+
         # Invalidate Prony cache if physics params changed, then init
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=should_use_diffrax)
 
         g = self._prony_amplitudes
         tau = self._prony_times
         assert g is not None
         assert tau is not None
-
-        # Determine which solver to use
-        should_use_diffrax = use_diffrax if use_diffrax is not None else _HAS_DIFFRAX
 
         if should_use_diffrax and _HAS_DIFFRAX:
             return self._predict_flow_curve_diffrax(
@@ -948,7 +948,7 @@ class ITTMCTSchematic(ITTMCTBase):
         # modes → misses glass plateau → G'(ω) shows ω² instead of plateau.
         self._check_prony_cache()
         if self._prony_amplitudes is None:
-            self.initialize_prony_modes()
+            self.initialize_prony_modes(use_diffrax=use_diffrax)
 
         # Need equilibrium correlator over sufficient time range
         omega_min = omega.min()

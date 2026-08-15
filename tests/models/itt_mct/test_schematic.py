@@ -669,8 +669,18 @@ class TestEquilibriumCorrelatorDiffrax:
             schematic_mod, "solve_equilibrium_correlator_trajectory", fake_solve
         )
 
+        calls = []
+        original_scipy = model._compute_equilibrium_correlator_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_compute_equilibrium_correlator_scipy", spy_scipy)
+
         phi = model._compute_equilibrium_correlator(t, use_diffrax=True)
 
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
         assert np.all(np.isfinite(np.array(phi)))
 
     def test_predict_oscillation_accepts_use_diffrax(self):
@@ -873,8 +883,18 @@ class TestStartupDiffrax:
 
         monkeypatch.setattr(schematic_mod, "solve_startup_trajectory", fake_solve)
 
+        calls = []
+        original_scipy = model._predict_startup_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_startup_scipy", spy_scipy)
+
         sigma = model.predict(t, test_mode="startup", gamma_dot=1.0, use_diffrax=True)
 
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
         assert np.all(np.isfinite(sigma))
 
 
@@ -953,8 +973,18 @@ class TestCreepDiffrax:
 
         monkeypatch.setattr(schematic_mod, "solve_creep_trajectory", fake_solve)
 
+        calls = []
+        original_scipy = model._predict_creep_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_creep_scipy", spy_scipy)
+
         J = model.predict(t, test_mode="creep", sigma_applied=1.0, use_diffrax=True)
 
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
         assert np.all(np.isfinite(J))
 
 
@@ -1054,10 +1084,20 @@ class TestRelaxationDiffrax:
 
         monkeypatch.setattr(schematic_mod, "solve_relaxation_trajectory", fake_solve)
 
+        calls = []
+        original_scipy = model._predict_relaxation_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_relaxation_scipy", spy_scipy)
+
         sigma = model.predict(
             t, test_mode="relaxation", gamma_pre=0.01, use_diffrax=True
         )
 
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
         assert np.all(np.isfinite(sigma))
 
 
@@ -1133,10 +1173,20 @@ class TestLAOSDiffrax:
 
         monkeypatch.setattr(schematic_mod, "solve_laos_trajectory", fake_solve)
 
+        calls = []
+        original_scipy = model._predict_laos_scipy
+
+        def spy_scipy(*args, **kwargs):
+            calls.append((args, kwargs))
+            return original_scipy(*args, **kwargs)
+
+        monkeypatch.setattr(model, "_predict_laos_scipy", spy_scipy)
+
         sigma = model.predict(
             t, test_mode="laos", gamma_0=0.1, omega=1.0, use_diffrax=True
         )
 
+        assert len(calls) == 1, "scipy fallback was not actually invoked"
         assert np.all(np.isfinite(sigma))
 
 
