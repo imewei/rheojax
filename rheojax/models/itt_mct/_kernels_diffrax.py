@@ -38,6 +38,7 @@ diffrax = lazy_import("diffrax")
 from rheojax.logging import get_logger
 from rheojax.models.itt_mct._kernels import (
     f12_equilibrium_correlator_rhs,
+    f12_volterra_creep_rhs,
     f12_volterra_relaxation_rhs,
     f12_volterra_startup_rhs,
     strain_decorrelation,
@@ -368,6 +369,100 @@ def solve_relaxation_trajectory(
 
     phi = jnp.clip(ys[:, 0], 0.0, 1.0)
     return jnp.where(failed, jnp.nan, phi)
+
+
+class CreepParams(NamedTuple):
+    """Parameters for creep-compliance ODE integration."""
+
+    sigma_applied: float
+    v1: float
+    v2: float
+    Gamma: float
+    gamma_c: float
+    G_inf: float
+    g: jnp.ndarray
+    tau: jnp.ndarray
+
+
+def make_creep_vector_field(
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+) -> Callable:
+    """Diffrax-compatible vector field for creep compliance, reusing
+    f12_volterra_creep_rhs unchanged."""
+
+    def vector_field(t: float, state: jnp.ndarray, args: CreepParams) -> jnp.ndarray:
+        return f12_volterra_creep_rhs(
+            state,
+            t,
+            args.sigma_applied,
+            args.v1,
+            args.v2,
+            args.Gamma,
+            args.gamma_c,
+            args.G_inf,
+            args.g,
+            args.tau,
+            n_modes,
+            use_lorentzian,
+            memory_form=memory_form,
+        )
+
+    return vector_field
+
+
+def solve_creep_trajectory(
+    t_array: jnp.ndarray,
+    sigma_applied: float,
+    v1: float,
+    v2: float,
+    Gamma: float,
+    gamma_c: float,
+    G_inf: float,
+    g: jnp.ndarray,
+    tau: jnp.ndarray,
+    n_modes: int,
+    use_lorentzian: bool = False,
+    memory_form: str = "simplified",
+    rtol: float = 1e-6,
+    atol: float = 1e-8,
+    max_steps: int = 65536,
+) -> jnp.ndarray:
+    """Solve creep strain gamma(t) using diffrax.
+
+    State: [Phi, K_1..K_n, gamma, gamma_dot]. Returns gamma(t_array) --
+    callers compute J = gamma / sigma_applied. NaN-filled on failure.
+
+    Creep is the stiffest of the 5 new sites (gamma_dot relaxes toward
+    an implicit target derived from sigma_applied / G_current, producing
+    sharp transients near the glass transition) -- most likely of the 5
+    to need the whole-call scipy fallback in practice.
+    """
+    vector_field = make_creep_vector_field(n_modes, use_lorentzian, memory_form)
+    params = CreepParams(
+        sigma_applied=sigma_applied,
+        v1=v1,
+        v2=v2,
+        Gamma=Gamma,
+        gamma_c=gamma_c,
+        G_inf=G_inf,
+        g=g,
+        tau=tau,
+    )
+
+    # State: [Phi, K_1..K_n, gamma, gamma_dot]. gamma(0) = elastic jump
+    # sigma_applied/G_inf; gamma_dot(0) = 0 (rate starts from rest).
+    state0 = jnp.zeros(3 + n_modes)
+    state0 = state0.at[0].set(1.0)
+    state0 = state0.at[1 + n_modes].set(sigma_applied / G_inf)
+
+    ys, failed = _solve_trajectory(
+        vector_field, state0, params, jnp.asarray(t_array), rtol, atol, max_steps
+    )
+
+    gamma = ys[:, -2]
+    return jnp.where(failed, jnp.nan, gamma)
 
 
 # =============================================================================

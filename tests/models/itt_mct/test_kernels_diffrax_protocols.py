@@ -16,6 +16,7 @@ jax, jnp = safe_import_jax()
 diffrax = pytest.importorskip("diffrax")
 
 from rheojax.models.itt_mct._kernels_diffrax import (
+    solve_creep_trajectory,
     solve_equilibrium_correlator_trajectory,
     solve_relaxation_trajectory,
     solve_startup_trajectory,
@@ -137,3 +138,33 @@ class TestRelaxationTrajectory:
 
         # Phi is O(1) (dimensionless correlator), not O(G_inf) (stress-scale).
         assert np.all(np.abs(np.array(phi)) <= 1.0)
+
+
+class TestCreepTrajectory:
+    def test_strain_grows_from_elastic_jump(self):
+        n_modes = 10
+        tau = jnp.logspace(-2, 2, n_modes)
+        g = jnp.ones(n_modes) / n_modes
+        t = jnp.linspace(0.01, 10.0, 30)
+        G_inf = 1e6
+        sigma_applied = 1.0
+
+        gamma = solve_creep_trajectory(
+            t,
+            sigma_applied=sigma_applied,
+            v1=0.0,
+            v2=3.0,
+            Gamma=1.0,
+            gamma_c=0.1,
+            G_inf=G_inf,
+            g=g,
+            tau=tau,
+            n_modes=n_modes,
+        )
+
+        assert gamma.shape == (30,)
+        assert np.all(np.isfinite(gamma))
+        # Strain should be at or above the elastic-jump floor and grow.
+        elastic_jump = sigma_applied / G_inf
+        assert gamma[0] >= elastic_jump * 0.5
+        assert gamma[-1] >= gamma[0]
