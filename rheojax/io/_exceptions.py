@@ -28,14 +28,6 @@ class RheoJaxValidationWarning(UserWarning):
 # ---------------------------------------------------------------------------
 
 
-class RheoJaxFitError(RuntimeError):
-    """Raised for unrecoverable fit failures.
-
-    Examples include optimizer divergence, singular Hessian, or unsupported
-    protocol/model combinations.
-    """
-
-
 class RheoJaxInitWarning(UserWarning):
     """Emitted when auto_p0 estimation partially fails.
 
@@ -50,14 +42,6 @@ class RheoJaxPhysicsWarning(UserWarning):
 
     Examples: negative moduli, fractional orders outside [0, 1],
     negative relaxation times, or thermodynamically inconsistent parameters.
-    """
-
-
-class RheoJaxConvergenceWarning(UserWarning):
-    """Emitted when an optimizer converges but with caveats.
-
-    Examples: maximum iterations reached, gradient norm above threshold,
-    active bound constraints at the solution, or poor condition number.
     """
 
 

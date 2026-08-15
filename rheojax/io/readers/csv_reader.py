@@ -474,12 +474,16 @@ def _read_csv_dataframe(
     # Read CSV file with tolerant encoding/dialect handling.
     # "replace" kwarg is kept as the tolerant fallback; "strict" is tried first
     # so that silent corruption is caught and logged before falling back.
+    # The C engine is ~10-30x faster than the python engine but only
+    # supports single-character separators; regex separators (e.g. the
+    # r"\s+" that detect_csv_delimiter can return) require the python engine.
+    engine = "c" if isinstance(delimiter, str) and len(delimiter) == 1 else "python"
     read_kwargs = dict(
         sep=delimiter,
         header=header,
         encoding=default_encoding,
         encoding_errors="replace",
-        engine="python",
+        engine=engine,
         usecols=usecols,
         comment=comment_char,
         **kwargs,

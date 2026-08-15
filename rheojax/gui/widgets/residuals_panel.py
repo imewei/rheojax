@@ -626,8 +626,13 @@ class ResidualsPanel(QWidget):
         width = 0.8 / len(parts)
         for i, (label, residuals) in enumerate(parts):
             centered = residuals - np.mean(residuals)
-            autocorr = np.correlate(centered, centered, mode="full")
-            autocorr = autocorr[n - 1 : n - 1 + max_lag]
+            # Only max_lag (<=40) lags are ever plotted, so compute those
+            # directly (O(max_lag * n)) instead of the full 2n-1 lag
+            # np.correlate(mode="full") output (O(n^2)), which froze the
+            # GUI thread on large residual arrays.
+            autocorr = np.array(
+                [np.dot(centered[: n - k], centered[k:]) for k in range(max_lag)]
+            )
             # VIS-018: Guard against zero normalization (perfect fit / constant residuals)
             if autocorr[0] < 1e-15:
                 autocorr = np.zeros_like(autocorr)

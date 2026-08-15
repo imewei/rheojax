@@ -659,14 +659,27 @@ class BatchPipeline:
                 model=model.__class__.__name__,
                 data_shape=X.shape,
             ) as ctx:
-                metrics["r_squared"] = model.score(X, y)
+                # Predict once and derive R²/RMSE from it (avoid calling
+                # model.score(), which would re-run predict() a second
+                # time), matching BaseModel.score()'s formula and
+                # degeneracy guard exactly (rheojax/core/base.py:1047).
+                y_arr = np.asarray(y)
+                y_pred = model.predict(X)
+                residuals = y_arr - np.asarray(y_pred)
+                ss_res = float(np.sum(np.abs(residuals) ** 2))
+                ss_tot = float(np.sum(np.abs(y_arr - np.mean(y_arr)) ** 2))
+                eps = np.finfo(float).eps
+                scale = max(1.0, float(np.max(np.abs(y_arr))))
+                if ss_tot == 0 or abs(ss_tot) < eps * scale**2:
+                    metrics["r_squared"] = float("nan")
+                else:
+                    r2 = 1 - (ss_res / ss_tot)
+                    metrics["r_squared"] = float("nan") if np.isnan(r2) else r2
                 metrics["parameters"] = model.get_params()
                 metrics["model"] = model.__class__.__name__
 
                 # Calculate RMSE
                 # R8-PIPE-005: handle complex oscillation data in RMSE
-                y_pred = model.predict(X)
-                residuals = np.asarray(y) - np.asarray(y_pred)
                 metrics["rmse"] = float(np.sqrt(np.mean(np.abs(residuals) ** 2)))
 
                 ctx["r_squared"] = metrics["r_squared"]

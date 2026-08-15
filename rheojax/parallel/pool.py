@@ -17,7 +17,7 @@ import weakref
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
-from rheojax.parallel.config import get_default_workers
+from rheojax.parallel.config import cap_thread_env_vars, get_default_workers
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,7 @@ def _worker_loop(
     result_queue: mp.Queue,
     worker_id: int,
     shutdown_sentinel: object,
+    n_workers: int,
 ) -> None:
     """Worker main loop — runs in a subprocess.
 
@@ -70,6 +71,12 @@ def _worker_loop(
     Sends (task_id, "ok", result) or (task_id, "error", error_str) to result_queue.
     Exits when it receives the shutdown sentinel.
     """
+    # Each worker is a separate process; without a cap, every worker's
+    # BLAS/XLA backend sizes its thread pool to the full host core count,
+    # so n_workers processes oversubscribe the host by ~n_workers x. This
+    # must run before any JAX/BLAS import in this fresh subprocess.
+    cap_thread_env_vars(n_workers)
+
     while True:
         try:
             task = task_queue.get()
@@ -233,7 +240,13 @@ class PersistentProcessPool:
         for i in range(self._n_workers):
             p = self._ctx.Process(
                 target=_worker_loop,
-                args=(self._task_queue, self._result_queue, i, self._shutdown_sentinel),
+                args=(
+                    self._task_queue,
+                    self._result_queue,
+                    i,
+                    self._shutdown_sentinel,
+                    self._n_workers,
+                ),
                 daemon=True,
             )
             p.start()

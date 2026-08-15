@@ -273,8 +273,8 @@ class _PipelineIO(_PipelineState):
                         fit_quality["domain"] = self.data.domain
 
                     excel_payload: dict[str, Any] = {
-                        "x": np.array(self.data.x),
-                        "predictions": np.array(self.data.y),
+                        "x": np.asarray(self.data.x),
+                        "predictions": np.asarray(self.data.y),
                     }
                     if parameters:
                         excel_payload["parameters"] = parameters
@@ -287,8 +287,8 @@ class _PipelineIO(_PipelineState):
                     # columns; 2D y is split into numbered columns.
                     import pandas as pd
 
-                    x_arr = np.array(self.data.x)
-                    y_arr = np.array(self.data.y)
+                    x_arr = np.asarray(self.data.x)
+                    y_arr = np.asarray(self.data.y)
                     if np.iscomplexobj(y_arr):
                         df = pd.DataFrame(
                             {

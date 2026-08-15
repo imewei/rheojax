@@ -1603,8 +1603,8 @@ class SGRConventional(BaseModel):
         Integrates the evolution equation:
             dx/dt = -alpha_aging * (x - x_eq) + beta_rejuv * gamma_dot(t) * (x_ss(t) - x)
 
-        Uses JAX ODE integration (jax.experimental.ode.odeint) for stability
-        and compatibility with JAX transformations.
+        Uses diffrax (Tsit5 + PIDController) for stability and compatibility
+        with JAX transformations.
 
         Args:
             t: Time array (s)

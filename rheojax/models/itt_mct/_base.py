@@ -463,7 +463,8 @@ class ITTMCTBase(BaseModel):
             return y_combined - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
-        # incompatible with the diffrax ODE solver in _predict_oscillation.
+        # incompatible with the host-side scipy.integrate.solve_ivp ODE
+        # solver in _predict_oscillation (not diffrax, which is AD-safe).
         # We force-override here because BaseModel.fit() injects method='nlsq'
         # as its default, which would re-enter the broken AD path.
         kwargs["method"] = "scipy"
@@ -522,7 +523,8 @@ class ITTMCTBase(BaseModel):
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
-        # incompatible with the diffrax ODE solver in _predict_startup
+        # incompatible with the host-side scipy.integrate.solve_ivp ODE
+        # solver in _predict_startup (not diffrax, which is AD-safe)
         kwargs["method"] = "scipy"
         result = fit_with_nlsq(
             residual_func,
@@ -579,7 +581,8 @@ class ITTMCTBase(BaseModel):
             return J - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
-        # incompatible with the diffrax ODE solver in _predict_creep
+        # incompatible with the host-side scipy.integrate.solve_ivp ODE
+        # solver in _predict_creep (not diffrax, which is AD-safe)
         kwargs["method"] = "scipy"
         result = fit_with_nlsq(
             residual_func,
@@ -636,7 +639,8 @@ class ITTMCTBase(BaseModel):
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
-        # incompatible with the diffrax ODE solver in _predict_relaxation
+        # incompatible with the host-side scipy.integrate.solve_ivp ODE
+        # solver in _predict_relaxation (not diffrax, which is AD-safe)
         kwargs["method"] = "scipy"
         result = fit_with_nlsq(
             residual_func,
@@ -696,7 +700,8 @@ class ITTMCTBase(BaseModel):
             return sigma - y_pred
 
         # method="scipy" bypasses NLSQ's forward-mode AD which is
-        # incompatible with the diffrax ODE solver in _predict_laos
+        # incompatible with the host-side scipy.integrate.solve_ivp ODE
+        # solver in _predict_laos (not diffrax, which is AD-safe)
         kwargs["method"] = "scipy"
         result = fit_with_nlsq(
             residual_func,

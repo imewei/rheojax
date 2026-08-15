@@ -16,19 +16,11 @@ sk_derivatives
 from __future__ import annotations
 
 from collections.abc import Callable
-from functools import partial
-from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.interpolate import CubicSpline
 
-from rheojax.core.jax_config import safe_import_jax
 from rheojax.logging import get_logger
-
-if TYPE_CHECKING:
-    import jax
-
-jax, jnp = safe_import_jax()
 
 logger = get_logger(__name__)
 
@@ -137,64 +129,6 @@ def percus_yevick_sk(
     return S_k
 
 
-@partial(jax.jit, static_argnames=())
-def percus_yevick_sk_jax(
-    k: jax.Array,
-    phi: float,
-    sigma: float = 1.0,
-) -> jax.Array:
-    """JAX-compatible Percus-Yevick S(k) computation.
-
-    Parameters
-    ----------
-    k : jax.Array
-        Wave vector magnitudes
-    phi : float
-        Volume fraction
-    sigma : float, default 1.0
-        Particle diameter
-
-    Returns
-    -------
-    jax.Array
-        Structure factor S(k)
-    """
-    q = k * sigma
-    eta = phi
-
-    denom = (1 - eta) ** 4
-    a_coeff = (1 + 2 * eta) ** 2 / denom
-    b_coeff = -6 * eta * (1 + eta / 2) ** 2 / denom
-    c_coeff = eta * a_coeff / 2
-
-    # Safe division: use 1.0 (not 1e-10) so the masked branch stays finite.
-    # jnp.where evaluates both branches — q_safe=1e-10 → q6=1e-60 → inf
-    # in the unused branch, which corrupts VJP gradients.
-    q_safe = jnp.where(jnp.abs(q) < 1e-10, 1.0, q)
-    q2 = q_safe * q_safe
-    q3 = q2 * q_safe
-    q4 = q2 * q2
-    q6 = q3 * q3
-
-    sin_q = jnp.sin(q_safe)
-    cos_q = jnp.cos(q_safe)
-
-    term1 = a_coeff * (sin_q - q_safe * cos_q) / q3
-    term2 = b_coeff * ((2 * q_safe * sin_q + (2 - q2) * cos_q - 2) / q4)
-    term3 = c_coeff * (
-        (-q4 * cos_q + 4 * ((3 * q2 - 6) * cos_q + (q3 - 6 * q_safe) * sin_q + 6)) / q6
-    )
-
-    c_k = -24 * eta * (term1 + term2 + term3)
-    S_k = 1.0 / jnp.maximum(1.0 - c_k, 1e-10)
-
-    # k=0 limit: PY compressibility route
-    S_0 = (1 - eta) ** 4 / (1 + 2 * eta) ** 2
-    S_k = jnp.where(jnp.abs(q) < 1e-10, S_0, S_k)
-
-    return S_k
-
-
 # =============================================================================
 # Structure Factor Interpolation
 # =============================================================================
@@ -270,58 +204,6 @@ def interpolate_sk(
     sk_interp = np.maximum(sk_interp, 1e-10)
 
     return sk_interp
-
-
-def create_sk_interpolator(
-    k_data: np.ndarray,
-    sk_data: np.ndarray,
-) -> CubicSpline:
-    """Create a cubic spline interpolator for S(k).
-
-    Parameters
-    ----------
-    k_data : np.ndarray
-        Wave vectors at which S(k) is provided
-    sk_data : np.ndarray
-        Structure factor values
-
-    Returns
-    -------
-    CubicSpline
-        Interpolator object that can be called as sk_spline(k)
-    """
-    sort_idx = np.argsort(k_data)
-    return CubicSpline(k_data[sort_idx], sk_data[sort_idx], extrapolate=True)
-
-
-def create_sk_interpolator_jax(
-    k_data: np.ndarray,
-    sk_data: np.ndarray,
-) -> Callable[[jax.Array], jax.Array]:
-    """Create a JAX-compatible cubic spline interpolator for S(k).
-
-    Uses a pure-JAX C1 local cubic Hermite spline (matching interpax's former
-    ``method="cubic"``) for JIT-compatible, differentiable interpolation.
-    Suitable for use inside jax.jit-decorated functions.
-
-    Parameters
-    ----------
-    k_data : np.ndarray
-        Wave vectors at which S(k) is provided (sorted ascending)
-    sk_data : np.ndarray
-        Structure factor values
-
-    Returns
-    -------
-    Callable[[jax.Array], jax.Array]
-        JAX-native interpolator callable as sk_interp(k)
-    """
-    from rheojax.utils.jax_cubic_spline import local_cubic_eval
-
-    sort_idx = np.argsort(k_data)
-    k_sorted = jnp.asarray(k_data[sort_idx])
-    sk_sorted = jnp.asarray(sk_data[sort_idx])
-    return partial(local_cubic_eval, k_sorted, sk_sorted)
 
 
 # =============================================================================

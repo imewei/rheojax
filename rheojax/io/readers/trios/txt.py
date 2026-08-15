@@ -234,12 +234,7 @@ def load_trios(filepath: str | Path, **kwargs) -> RheoData | list[RheoData]:
         # if multiple segments are detected but segment_index is not specified.
         if "segment_index" not in kwargs:
             # Quick scan to count segments for the warning
-            _enc = _detect_txt_encoding(filepath)
-            _seg_count = 0
-            with open(filepath, encoding=_enc, errors="replace") as _f:
-                for _line in _f:
-                    if re.match(r"\[step\]", _line, re.IGNORECASE):
-                        _seg_count += 1
+            _seg_count = _count_txt_segments(filepath, _detect_txt_encoding(filepath))
             if _seg_count > 1:
                 logger.warning(
                     "Multiple segments detected but segment_index not specified; "
@@ -811,8 +806,8 @@ def _process_complex_row(
     x_col: int,
     y_col: int,
     y_col2: int,
-    y_units_orig: str,
-    y_units2_orig: str,
+    factor_real: float,
+    factor_imag: float,
 ) -> tuple[float | None, complex | None]:
     """Process a single row for complex modulus data.
 
@@ -821,15 +816,16 @@ def _process_complex_row(
         x_col: X column index
         y_col: Y column index (storage modulus)
         y_col2: Y2 column index (loss modulus)
-        y_units_orig: Original units for storage modulus
-        y_units2_orig: Original units for loss modulus
+        factor_real: Unit conversion multiplier for the storage modulus
+            column, constant across a segment (see convert_units()).
+        factor_imag: Unit conversion multiplier for the loss modulus column.
 
     Returns:
         Tuple of (x_val, y_val) or (None, None) if invalid
     """
     x_val = row[x_col]
-    y_val_real = convert_units(row[y_col], y_units_orig, "Pa")
-    y_val_imag = convert_units(row[y_col2], y_units2_orig, "Pa")
+    y_val_real = row[y_col] * factor_real
+    y_val_imag = row[y_col2] * factor_imag
 
     if np.isnan(x_val) or np.isnan(y_val_real) or np.isnan(y_val_imag):
         return None, None
@@ -1209,6 +1205,30 @@ def _process_remaining_rows(
     max_col_needed = max(x_col, y_col, y_col2 if y_col2 is not None else 0)
     _skipped_rows = 0
 
+    # Units are constant for the whole segment, so the conversion factor is
+    # computed once here rather than via a per-row convert_units() call
+    # (dict lookup + branch + warnings.warn stack-walk on every row).
+    if is_complex:
+        if y_units2_orig is None:  # pragma: no cover - guarded by caller
+            raise ValueError("y_col2 and y_units2 required for complex data")
+        factor_real = float(convert_units(1.0, y_units_orig, y_units))
+        factor_imag = float(convert_units(1.0, y_units2_orig, y_units))
+        # A bad unit-table entry would otherwise silently zero/sign-flip
+        # every row of the segment instead of failing at the source.
+        if not (math.isfinite(factor_real) and factor_real > 0):
+            raise ValueError(
+                f"Invalid unit conversion factor for {y_units_orig!r} -> "
+                f"{y_units!r}: {factor_real}"
+            )
+        if not (math.isfinite(factor_imag) and factor_imag > 0):
+            raise ValueError(
+                f"Invalid unit conversion factor for {y_units2_orig!r} -> "
+                f"{y_units!r}: {factor_imag}"
+            )
+    else:
+        factor_real = 1.0
+        factor_imag = 1.0
+
     for line in file_handle:
         line_num += 1
 
@@ -1234,7 +1254,7 @@ def _process_remaining_rows(
                 if y_col2 is None or y_units2_orig is None:  # pragma: no cover
                     raise ValueError("y_col2 and y_units2 required for complex data")
                 x_val, y_val = _process_complex_row(
-                    row, x_col, y_col, y_col2, y_units_orig, y_units2_orig
+                    row, x_col, y_col, y_col2, factor_real, factor_imag
                 )
             else:
                 x_val, y_val = _process_real_row(row, x_col, y_col)
