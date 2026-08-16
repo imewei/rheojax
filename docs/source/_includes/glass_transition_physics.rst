@@ -45,7 +45,6 @@
 
    **Related Concepts:**
 
-   - :doc:`/user_guide/soft_glassy_materials` — Introduction to SGMs
    - :doc:`/transforms/mastercurve` — Time-temperature superposition near :math:`T_g`
    - :doc:`/models/sgr/index` — SGR model family
    - :doc:`/models/itt_mct/index` — Mode-coupling theory approach

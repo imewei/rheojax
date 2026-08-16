@@ -884,7 +884,6 @@ See Also
 Related tutorials in this documentation:
 
 * :doc:`/user_guide/03_advanced_topics/thixotropy_yielding` — Complementary thixotropy guide
-* :doc:`/user_guide/02_core_concepts/bayesian_inference` — Bayesian workflow details
 * :doc:`/user_guide/03_advanced_topics/sgr_analysis` — Alternative statistical mechanics approach
 
 Model handbooks:
@@ -894,8 +893,3 @@ Model handbooks:
 * :doc:`/models/fikh/fmlikh` — Fractional IKH variants
 * :doc:`/models/fluidity/saramito_evp` — Saramito EVP details
 * :doc:`/models/fluidity/index` — Fluidity framework overview
-
-Performance optimization:
-
-* :doc:`/user_guide/03_advanced_topics/performance_optimization` — JAX compilation, batching
-* :doc:`/user_guide/04_reference/api_core` — Core API reference

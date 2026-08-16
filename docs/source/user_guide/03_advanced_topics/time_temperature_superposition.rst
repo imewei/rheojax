@@ -600,7 +600,6 @@ See Also
 
 - :doc:`../../models/multi_mode/generalized_maxwell` — Multi-mode GMM for mastercurve fitting
 - `Mastercurve Auto-Shift <https://github.com/imewei/rheojax/blob/main/examples/transforms/06-mastercurve_auto_shift.ipynb>`__ — Automatic shift factors notebook
-- :doc:`../../api/transforms/mastercurve` — Full API reference
 
 References
 ----------

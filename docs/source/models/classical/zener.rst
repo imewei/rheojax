@@ -1029,7 +1029,6 @@ Model Hierarchy (Simpler → More Complex)
    - 4 parameters
    - Combines Maxwell + Kelvin-Voigt
    - Better creep modeling than Zener
-   - See :doc:`../advanced/burgers` (if available)
 
 **Level 4: Generalized Maxwell**
    - :math:`2N+1` parameters (N modes + equilibrium)

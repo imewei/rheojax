@@ -1478,7 +1478,6 @@ Next Steps
 * **Detailed model documentation:** See :doc:`/models/index` for individual model handbooks
 * **Multi-technique fitting:** :doc:`/user_guide/03_advanced_topics/multi_technique_fitting`
 * **Model selection workflow:** :doc:`/user_guide/02_model_usage/model_selection`
-* **Compatibility checking:** :doc:`/user_guide/core_concepts` (automatic detection of model-data mismatches)
 * **Giesekus models:** :doc:`/models/giesekus/giesekus` for nonlinear viscoelastic polymer melts and solutions
 * **SGR models:** :doc:`/models/sgr/sgr_conventional` and :doc:`/models/sgr/sgr_generic`
 * **ITT-MCT models:** :doc:`/models/itt_mct/itt_mct_schematic` and :doc:`/models/itt_mct/itt_mct_isotropic` for colloidal glasses

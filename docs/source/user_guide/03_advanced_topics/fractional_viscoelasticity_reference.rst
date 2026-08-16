@@ -463,6 +463,5 @@ See Also
 --------
 
 - :doc:`/models/index` — Complete model catalog with governing equations
-- :doc:`/user_guide/core_concepts` — RheoData, parameters, and test modes
 - :doc:`/user_guide/04_practical_guides/modular_api` — Direct model API usage
 - :doc:`/user_guide/03_advanced_topics/bayesian_inference` — Bayesian inference for fractional models

@@ -611,7 +611,6 @@ Transforms
 
 - :doc:`../../transforms/fft` — convert relaxation data to :math:`G^*(\omega)` before fitting
 - :doc:`../../transforms/mastercurve` — time-temperature superposition for polymer melts
-- :doc:`../../transforms/derivatives` — compute loss tangent :math:`\tan\delta` from :math:`G'` and :math:`G''`
 
 Examples
 ~~~~~~~~

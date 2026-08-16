@@ -717,14 +717,6 @@ See Also
 **Transforms and Utilities:**
 
 - :doc:`/transforms/mastercurve` — Time-temperature superposition for thermorheology
-- :doc:`/transforms/derivatives` — Numerical differentiation for :math:`G(t)` → :math:`G'`, :math:`G''`
-- :doc:`/utils/prony` — Prony series decomposition for multi-mode fitting
-
-**User Guides:**
-
-- :doc:`/user_guide/transient_networks` — Introduction to TNT physics
-- :doc:`/user_guide/associating_polymers` — Telechelic and multi-sticker systems
-- :doc:`/user_guide/living_polymers` — Wormlike micelles and scission/recombination
 
 
 References
