@@ -403,7 +403,7 @@ See Also
 - :doc:`prony_conversion` — Discrete Prony series (complementary parametric approach)
 - :doc:`lve_envelope` — Uses Prony/spectrum parameters for startup prediction
 - :doc:`fft` — Non-parametric time↔frequency interconversion
-- :doc:`../models/gmm/generalized_maxwell` — Multi-mode Maxwell model (discrete spectrum)
+- :doc:`../models/multi_mode/generalized_maxwell` — Multi-mode Maxwell model (discrete spectrum)
 - :doc:`../models/fractional/fractional_maxwell_model` — Power-law spectrum (fractional model)
 
 

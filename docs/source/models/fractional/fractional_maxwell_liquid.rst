@@ -618,7 +618,7 @@ Examples
 
 - :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook covering the complete Fractional Maxwell family
 - :doc:`../../examples/fitting/01-smart-initialization` — demonstration of automatic initialization (v0.2.0)
-- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing models
+- :doc:`../../user_guide/02_model_usage/model_selection` — decision flowcharts for choosing models
 
 References
 ----------

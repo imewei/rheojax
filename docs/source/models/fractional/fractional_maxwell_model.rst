@@ -459,7 +459,7 @@ Examples and Guides
 
 - :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing all fractional families on synthetic and experimental data
 - :doc:`../../examples/model-comparison/01-fractional-family` — systematic comparison using AIC/BIC criteria
-- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing between single-order and two-order models
+- :doc:`../../user_guide/02_model_usage/model_selection` — decision flowcharts for choosing between single-order and two-order models
 
 References
 ----------

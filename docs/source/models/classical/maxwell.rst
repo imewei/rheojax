@@ -964,7 +964,7 @@ See Also
 
 **User Guides:**
 
-- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing rheological models
+- :doc:`../../user_guide/02_model_usage/model_selection` — decision flowcharts for choosing rheological models
 
 References
 ----------

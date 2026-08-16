@@ -1860,7 +1860,7 @@ See Also
 - :doc:`../../transforms/mastercurve` — Time-temperature superposition (automatic shift factors)
 - :doc:`../../examples/advanced/08-generalized_maxwell_fitting` — Complete GMM workflow notebook
 - :doc:`../../examples/bayesian/07-gmm_bayesian_workflow` — Bayesian inference with prior safety
-- :doc:`../../user_guide/model_selection` — Decision flowcharts for model selection
+- :doc:`../../user_guide/02_model_usage/model_selection` — Decision flowcharts for model selection
 
 References
 ----------

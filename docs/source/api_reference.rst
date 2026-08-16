@@ -372,16 +372,16 @@ Getting Started
 
 For new users, we recommend:
 
-1. **Read the User Guide**: :doc:`user_guide/getting_started`
+1. **Read the User Guide**: :doc:`user_guide/02_model_usage/getting_started`
 2. **Try the Pipeline API**: :doc:`api/pipeline` for high-level workflows
 3. **Explore Models**: :doc:`api/models` to understand available models
 4. **Learn Transforms**: :doc:`api/transforms` for data preprocessing
 
 For advanced users:
 
-1. **Master the Modular API**: :doc:`user_guide/modular_api`
+1. **Master the Modular API**: :doc:`user_guide/04_practical_guides/modular_api`
 2. **Understand Core Classes**: :doc:`api/core`
-3. **Implement Custom Workflows**: :doc:`user_guide/multi_technique_fitting`
+3. **Implement Custom Workflows**: :doc:`user_guide/03_advanced_topics/multi_technique_fitting`
 
 Version Information
 -------------------

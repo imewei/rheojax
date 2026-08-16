@@ -1334,10 +1334,10 @@ Additional Resources
 ====================
 
 **Related Documentation**
-   - :doc:`../user_guide/bayesian_inference` - Complete Bayesian inference guide
-   - :doc:`../user_guide/pipeline_api` - Pipeline API reference
-   - :doc:`../user_guide/transforms` - Transform workflows
-   - :doc:`../user_guide/modular_api` - Modular API patterns
+   - :doc:`../user_guide/03_advanced_topics/bayesian_inference` - Complete Bayesian inference guide
+   - :doc:`../user_guide/04_practical_guides/pipeline_api` - Pipeline API reference
+   - :doc:`../user_guide/03_advanced_topics/transforms_complete` - Transform workflows
+   - :doc:`../user_guide/04_practical_guides/modular_api` - Modular API patterns
 
 **Example Data**
    - ``examples/data/README.md`` - Dataset catalog and loading instructions

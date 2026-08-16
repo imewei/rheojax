@@ -306,7 +306,7 @@ See Also
 --------
 
 - :doc:`/models/classical/index` — Integer-order building blocks
-- :doc:`/user_guide/fractional_viscoelasticity_reference` — Mathematical foundations
+- :doc:`/user_guide/03_advanced_topics/fractional_viscoelasticity_reference` — Mathematical foundations
 - :doc:`/models/sgr/index` — Power-law from disordered structure (SGR approach)
 - :doc:`/transforms/mastercurve` — Time-temperature superposition
 - :doc:`/examples/advanced/04-fractional-models-deep-dive` — Comparison notebook

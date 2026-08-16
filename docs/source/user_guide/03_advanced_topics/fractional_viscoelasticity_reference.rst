@@ -446,7 +446,7 @@ Further Reading
 
 **Within RheoJAX Documentation:**
 
-- :doc:`/user_guide/model_selection` — Decision flowcharts for choosing fractional vs classical models
+- :doc:`/user_guide/02_model_usage/model_selection` — Decision flowcharts for choosing fractional vs classical models
 - :doc:`/developer/architecture` — Template Method pattern for smart initialization
 - :doc:`/examples/advanced/04-fractional-models-deep-dive` — Jupyter notebook with case studies
 
@@ -464,5 +464,5 @@ See Also
 
 - :doc:`/models/index` — Complete model catalog with governing equations
 - :doc:`/user_guide/core_concepts` — RheoData, parameters, and test modes
-- :doc:`/user_guide/modular_api` — Direct model API usage
-- :doc:`/user_guide/bayesian_inference` — Bayesian inference for fractional models
+- :doc:`/user_guide/04_practical_guides/modular_api` — Direct model API usage
+- :doc:`/user_guide/03_advanced_topics/bayesian_inference` — Bayesian inference for fractional models

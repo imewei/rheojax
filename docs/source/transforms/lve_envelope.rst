@@ -121,7 +121,7 @@ Parameter Selection Guidelines
 **Prony parameters:**
 
 - Obtain from :doc:`prony_conversion` transform
-- Or from :doc:`../models/gmm/generalized_maxwell` model fitting
+- Or from :doc:`../models/multi_mode/generalized_maxwell` model fitting
 - Or supply directly from literature values
 
 
@@ -263,7 +263,7 @@ See Also
 
 - :doc:`prony_conversion` — Fit Prony parameters from :math:`G(t)` or :math:`G^*(\omega)` data
 - :doc:`spectrum_inversion` — Continuous spectrum recovery (alternative to Prony)
-- :doc:`../models/gmm/generalized_maxwell` — Multi-mode Maxwell model (provides Prony parameters)
+- :doc:`../models/multi_mode/generalized_maxwell` — Multi-mode Maxwell model (provides Prony parameters)
 - :doc:`../models/classical/maxwell` — Single Maxwell element (1-mode special case)
 - :doc:`fft` — Non-parametric time-frequency interconversion
 

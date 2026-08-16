@@ -23,9 +23,9 @@ to quickly compare available transforms and jump to details.
 See also
 --------
 
-- :doc:`../user_guide/transforms` — conceptual guide for choosing transforms.
+- :doc:`../user_guide/03_advanced_topics/transforms_complete` — conceptual guide for choosing transforms.
 - :doc:`../models/index` — connect transform outputs to model families.
 - :doc:`../examples/transforms/index` — executable notebooks for each transform.
 - :doc:`../api/models` — API reference for fitting models using transformed data.
-- :doc:`../user_guide/multi_technique_fitting` — integrate multiple transforms in a single
+- :doc:`../user_guide/03_advanced_topics/multi_technique_fitting` — integrate multiple transforms in a single
   workflow.

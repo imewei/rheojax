@@ -558,7 +558,7 @@ See Also
   required for fitting.
 - :doc:`../../examples/advanced/04-fractional-models-deep-dive` — case studies across
   fractional Zener solids.
-- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing between models.
+- :doc:`../../user_guide/02_model_usage/model_selection` — decision flowcharts for choosing between models.
 
 References
 ----------
