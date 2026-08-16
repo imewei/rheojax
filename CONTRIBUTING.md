@@ -47,13 +47,13 @@ git checkout -b feature/your-feature-name
 ### 3. Run tests
 
 ```bash
-# Run smoke tests (~1838 tests, CI gate)
+# Run smoke tests (~2037 tests, CI gate)
 uv run pytest -n 4 -m "smoke"
 
-# Run non-slow tests (~4714 tests)
+# Run non-slow tests (~6527 tests)
 uv run pytest -n 4 -m "not slow"
 
-# Run full suite (~4963 tests)
+# Run full suite (~6825 tests)
 uv run pytest -n 4
 
 # Run specific test file
