@@ -72,7 +72,7 @@ fundamentally different tools designed for different use cases:
 
 - **PronyConversion:** You have :math:`G(t)` or :math:`G^*(\omega)` and need the *other*
   domain representation, *or* you need Prony parameters for :doc:`lve_envelope` /
-  :doc:`../models/gmm/generalized_maxwell`. Best for material functions measured under
+  :doc:`../models/multi_mode/generalized_maxwell`. Best for material functions measured under
   standard protocols (relaxation, frequency sweep).
 
 - **FFT Analysis:** You have raw time-domain waveforms (stress/strain records) and need
@@ -384,7 +384,7 @@ See Also
 - :doc:`lve_envelope` — Uses Prony parameters to compute startup stress envelope
 - :doc:`fft` — Non-parametric time↔frequency conversion
 - :doc:`../models/classical/maxwell` — Single Maxwell element (1-mode Prony)
-- :doc:`../models/gmm/generalized_maxwell` — Multi-mode generalized Maxwell (N-mode Prony)
+- :doc:`../models/multi_mode/generalized_maxwell` — Multi-mode generalized Maxwell (N-mode Prony)
 
 
 API References

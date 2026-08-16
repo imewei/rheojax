@@ -1044,12 +1044,12 @@ The Modular API provides complete control over:
 4. **Advanced fitting workflows** (multi-start, sequential, hierarchical)
 5. **Integration** with external libraries (scikit-learn, JAX)
 
-For standard workflows, use the :doc:`/user_guide/pipeline_api`.
+For standard workflows, use the :doc:`/user_guide/04_practical_guides/pipeline_api`.
 
 Next Steps
 ----------
 
-- :doc:`/user_guide/pipeline_api` - High-level workflow API
-- :doc:`/user_guide/multi_technique_fitting` - Multi-technique fitting with shared parameters
+- :doc:`/user_guide/04_practical_guides/pipeline_api` - High-level workflow API
+- :doc:`/user_guide/03_advanced_topics/multi_technique_fitting` - Multi-technique fitting with shared parameters
 - :doc:`/api/models` - Complete model API reference
 - :doc:`/api/core` - Core classes (ParameterSet, RheoData, etc.)

@@ -611,14 +611,13 @@ Transforms
 
 - :doc:`../../transforms/fft` — convert relaxation data to :math:`G^*(\omega)` before fitting
 - :doc:`../../transforms/mastercurve` — time-temperature superposition for polymer melts
-- :doc:`../../transforms/derivatives` — compute loss tangent :math:`\tan\delta` from :math:`G'` and :math:`G''`
 
 Examples
 ~~~~~~~~
 
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook covering the complete Fractional Maxwell family
-- :doc:`../../examples/fitting/01-smart-initialization` — demonstration of automatic initialization (v0.2.0)
-- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing models
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — notebook covering the complete Fractional Maxwell family
+- Automatic initialization demonstration, v0.2.0 (example notebook not yet published)
+- :doc:`../../user_guide/02_model_usage/model_selection` — decision flowcharts for choosing models
 
 References
 ----------

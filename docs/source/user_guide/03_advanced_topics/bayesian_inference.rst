@@ -972,7 +972,7 @@ Further Reading
    - Betancourt (2017). "A Conceptual Introduction to Hamiltonian Monte Carlo"
 
 **RheoJAX Examples**
-   See :doc:`../examples/index` for 5 comprehensive Bayesian inference tutorial notebooks:
+   See :doc:`../../examples/index` for 5 comprehensive Bayesian inference tutorial notebooks:
 
    1. ``examples/bayesian/01-bayesian-basics.ipynb`` - Complete NLSQ -> NUTS workflow
    2. ``examples/bayesian/02-prior-selection.ipynb`` - Prior elicitation and sensitivity

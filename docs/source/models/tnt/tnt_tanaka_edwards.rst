@@ -1813,8 +1813,8 @@ See Also
 **Alternative constitutive models:**
 
 - :doc:`/models/giesekus/index` — Giesekus model family (nonlinear damping)
-- :doc:`/models/ptt/index` — Phan-Thien-Tanner model (shear thinning via trace of stress)
-- :doc:`/models/rolie_poly/index` — Rolie-Poly model (entangled polymer melts)
+- Phan-Thien-Tanner (PTT) model — shear thinning via trace of stress (not yet implemented in RheoJAX)
+- Rolie-Poly model — entangled polymer melts (not yet implemented in RheoJAX)
 
 **Theoretical background:**
 

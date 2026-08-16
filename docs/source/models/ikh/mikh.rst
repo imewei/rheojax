@@ -1359,6 +1359,6 @@ See Also
 --------
 
 - :doc:`ml_ikh` — Multi-mode extension for distributed thixotropic timescales
-- :doc:`/models/dmt/dmt_local` — Alternative thixotropic formulation (de Souza Mendes-Thompson)
-- :doc:`/models/fluidity/saramito` — Fluidity-Saramito EVP models with thixotropy
+- :doc:`/models/dmt/dmt` — Alternative thixotropic formulation (de Souza Mendes-Thompson)
+- :doc:`/models/fluidity/saramito_evp` — Fluidity-Saramito EVP models with thixotropy
 - :doc:`/user_guide/03_advanced_topics/index` — Advanced thixotropic modeling workflows

@@ -769,7 +769,7 @@ See Also
 
 - :doc:`fluidity_local` — Scalar fluidity model without tensorial stress
 - :doc:`fluidity_nonlocal` — Nonlocal model for shear banding
-- :doc:`../dmt/dmt_local` — DMT structural-kinetics thixotropic model
+- :doc:`../dmt/dmt` — DMT structural-kinetics thixotropic model
 - :doc:`../flow/herschel_bulkley` — Simpler yield stress model (steady shear only)
 
 ----

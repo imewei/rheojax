@@ -2,7 +2,7 @@ Transforms API
 ==============
 
 Concise reference for all built-in transforms. For workflows, diagrams, and tuning guidance
-see the :doc:`/transforms/index` handbook and :doc:`/user_guide/transforms`.
+see the :doc:`/transforms/index` handbook and :doc:`/user_guide/03_advanced_topics/transforms_complete`.
 
 FFTAnalysis
 ~~~~~~~~~~~

@@ -938,12 +938,12 @@ Pipeline API Checklist:
 6. **Error handling**: Use ``fail_on_error=False`` and check ``has_errors()``
 7. **Performance**: Use ``n_jobs`` for parallel, ``cache=True`` for speed
 
-The Pipeline API provides the fastest path from data to results. For maximum flexibility, combine with the Modular API (see :doc:`/user_guide/modular_api`).
+The Pipeline API provides the fastest path from data to results. For maximum flexibility, combine with the Modular API (see :doc:`/user_guide/04_practical_guides/modular_api`).
 
 Next Steps
 ----------
 
-- :doc:`/user_guide/modular_api` - Direct model and transform usage
-- :doc:`/user_guide/model_selection` - Choose the right model
-- :doc:`/user_guide/transforms` - Understand data transforms
+- :doc:`/user_guide/04_practical_guides/modular_api` - Direct model and transform usage
+- :doc:`/user_guide/02_model_usage/model_selection` - Choose the right model
+- :doc:`/user_guide/03_advanced_topics/transforms_complete` - Understand data transforms
 - ``examples/basic/`` - Complete example notebooks

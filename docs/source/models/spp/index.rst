@@ -257,7 +257,7 @@ See Also
 - :doc:`/models/epm/index` — Elasto-plastic models for yielding
 - :doc:`/models/dmt/index` — Thixotropic models with LAOS support
 - :doc:`/models/ikh/index` — IKH models with LAOS capabilities
-- :doc:`/examples/laos/01-spp-analysis` — SPP analysis tutorial
+- `SPP LAOS Tutorial <https://github.com/imewei/rheojax/blob/main/examples/advanced/10-spp-laos-tutorial.ipynb>`__ — SPP analysis tutorial
 
 
 References

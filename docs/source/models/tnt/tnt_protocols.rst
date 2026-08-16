@@ -1022,7 +1022,6 @@ See Also
 - Inkson et al. (1999): Bell breakage kinetics
 - Bird et al. (1987): FENE stress function
 - Cho et al. (2005): LAOS nonlinear analysis
-- RheoJAX Documentation: :doc:`../bayesian_inference`, :doc:`../optimization`
 
 References
 ----------

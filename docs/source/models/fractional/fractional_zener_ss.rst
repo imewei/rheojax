@@ -556,9 +556,9 @@ See Also
 - :doc:`fractional_maxwell_gel` — when the equilibrium spring is negligible.
 - :doc:`../../transforms/fft` — generate :math:`G'(\omega)` and :math:`G''(\omega)` inputs
   required for fitting.
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — case studies across
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — case studies across
   fractional Zener solids.
-- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing between models.
+- :doc:`../../user_guide/02_model_usage/model_selection` — decision flowcharts for choosing between models.
 
 References
 ----------

@@ -749,5 +749,5 @@ See Also
 --------
 
 - :doc:`architecture` - Architecture overview
-- :doc:`../user_guide/getting_started` - User guide
+- :doc:`../user_guide/02_model_usage/getting_started` - User guide
 - `GitHub repository <https://github.com/imewei/rheojax>`_

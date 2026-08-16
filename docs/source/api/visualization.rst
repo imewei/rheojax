@@ -558,7 +558,7 @@ Colorblind-Friendly
 See Also
 --------
 
-- :doc:`../user_guide/visualization_guide` - Comprehensive visualization guide
+- :doc:`../user_guide/04_practical_guides/visualization` - Comprehensive visualization guide
 - :doc:`core` - RheoData structure
 - `Matplotlib documentation <https://matplotlib.org/>`_ - Advanced plotting
 - `Matplotlib gallery <https://matplotlib.org/stable/gallery/index.html>`_ - Examples

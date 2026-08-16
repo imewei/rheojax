@@ -749,7 +749,7 @@ Benefits:
 Next Steps
 ----------
 
-- :doc:`/user_guide/model_selection` - Choose appropriate model
-- :doc:`/user_guide/modular_api` - Advanced parameter manipulation
+- :doc:`/user_guide/02_model_usage/model_selection` - Choose appropriate model
+- :doc:`/user_guide/04_practical_guides/modular_api` - Advanced parameter manipulation
 - :doc:`/api/core` - SharedParameterSet API reference
 - ``examples/advanced/multi_technique_fitting.ipynb`` - Complete example notebook

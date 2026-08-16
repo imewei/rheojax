@@ -1,17 +1,22 @@
-<!-- Generated: 2026-07-18 | Files scanned: pyproject.toml (not re-parsed; from CLAUDE.md/known stack) | Token estimate: ~450 -->
+<!-- Generated: 2026-07-18 | Refreshed 2026-08-16 against pyproject.toml directly (optimistix,
+     optax, lineax, interpax removed from the actual dependency list since this file was last
+     generated) | Files scanned: pyproject.toml | Token estimate: ~450 -->
 
 # Dependencies
 
 ## Numerical Core
 
-- **JAX / jaxlib** — computational core, x64 forced at import. GPU via `jax[cuda12/cuda13]`
-  extras (never both installed together).
-- **NLSQ** — GPU-accelerated non-linear least squares.
-- **optimistix** — root-finding.
-- **optax** — optimizer schedules.
-- **diffrax** — ODE solving (used instead of `jax.experimental.ode`).
-- **interpax** — JIT-safe interpolation (never `scipy.interpolate` in JIT paths).
-- **lineax** — linear algebra (recently upgraded, see git log `06f42c25`).
+- **JAX / jaxlib** (`>=0.8.3`) — computational core, x64 forced at import. GPU via
+  `jax[cuda12/cuda13]` extras (never both installed together).
+- **NLSQ** (`>=0.6.10`) — GPU-accelerated non-linear least squares; must be imported before JAX.
+- **diffrax** (`>=0.7.1`) — ODE solving (used instead of `jax.experimental.ode`).
+- **numpy** / **scipy** — array core and non-JIT-path numerics.
+
+Not actual dependencies (despite historically being listed here / in root CLAUDE.md's stated
+stack): **optimistix**, **optax**, **lineax** are not in `pyproject.toml`. **interpax** was
+removed and replaced by `rheojax.utils.jax_cubic_spline` — a pure-JAX cubic spline with no JAX
+version ceiling (see the `jax` dependency comment in `pyproject.toml` and
+`tests/utils/test_jax_cubic_spline.py` for the scipy-validated parity check).
 
 ## Bayesian
 
@@ -33,8 +38,9 @@
 ## Dev/Test
 
 - **uv** — package/environment manager, `uv.lock` is the lockfile source of truth.
-- **pytest** (+ **pytest-xdist**, **pytest-qt**, **pytest-timeout**, **pytest-benchmark**) — test
-  runner; `--dist=loadgroup` preserves NUTS-test isolation.
+- **pytest** (+ **pytest-xdist**, **pytest-qt**, **pytest-timeout**, **pytest-cov**,
+  **pytest-image-diff**, **hypothesis**) — test runner; `--dist=loadgroup` preserves NUTS-test
+  isolation.
 - **ruff** — lint (line-length 88, E/W/F/I/C/B/UP/S rule sets).
 - **mypy** — type check (`rheojax.gui.*`/`rheojax.cli.*` ignored for PySide6 stub gaps).
 

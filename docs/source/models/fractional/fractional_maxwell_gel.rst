@@ -624,6 +624,6 @@ Transforms
 Examples
 ~~~~~~~~
 
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — tutorial comparing Fractional Maxwell family
-- :doc:`../../examples/bayesian/02-fractional-gel-uncertainty` — uncertainty quantification for FMG
-- :doc:`../../examples/fitting/01-smart-initialization` — demonstration of automatic initialization (v0.2.0)
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — tutorial comparing Fractional Maxwell family
+- `Bayesian examples <https://github.com/imewei/rheojax/tree/main/examples/bayesian>`__ — uncertainty quantification for FMG
+- Automatic initialization demonstration, v0.2.0 (example notebook not yet published)

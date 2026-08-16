@@ -199,7 +199,7 @@ See Also
 - :doc:`/models/fractional/index` — Extended models with fractional calculus
 - :doc:`/models/multi_mode/generalized_maxwell` — Multiple Maxwell elements for broad spectra
 - :doc:`/transforms/mastercurve` — Time-temperature superposition
-- :doc:`/user_guide/model_selection` — Comprehensive model selection guide
+- :doc:`/user_guide/02_model_usage/model_selection` — Comprehensive model selection guide
 
 
 References

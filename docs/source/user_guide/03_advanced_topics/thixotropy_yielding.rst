@@ -284,7 +284,7 @@ Five Thixotropic Frameworks
    result = model.fit_bayesian(gamma_dot, sigma, test_mode='flow_curve',
                                 num_warmup=1000, num_samples=2000)
 
-**See:** :doc:`/models/dmt/index`, :doc:`/examples/dmt/index`
+**See:** :doc:`/models/dmt/index`, `DMT examples <https://github.com/imewei/rheojax/tree/main/examples/dmt>`__
 
 2. Fluidity Models
 ------------------
@@ -356,7 +356,7 @@ Five Thixotropic Frameworks
    if banding['is_banded']:
        print(f"High-rate band fraction: {banding['high_fraction']:.2f}")
 
-**See:** :doc:`/models/fluidity/index`, :doc:`/examples/fluidity/index`
+**See:** :doc:`/models/fluidity/index`, `Fluidity examples <https://github.com/imewei/rheojax/tree/main/examples/fluidity>`__
 
 3. Hébraud-Lequeux (HL)
 ------------------------
@@ -425,7 +425,7 @@ where :math:`P(\sigma, t)` is the probability density of local stress values.
    HL model requires PDE solver (JAX lax.scan). Memory-intensive for large grids;
    recommend ``n_points`` :math:`\leq` 100 for stability.
 
-**See:** :doc:`/models/hl/index`, :doc:`/examples/hl/index`
+**See:** :doc:`/models/hl/index`, `Hebraud-Lequeux examples <https://github.com/imewei/rheojax/tree/main/examples/hl>`__
 
 4. STZ (Shear Transformation Zone)
 -----------------------------------
@@ -491,7 +491,7 @@ where :math:`\chi_0` is the "configurational temperature" and :math:`\chi > \chi
    else:
        print("Material is jammed at rest (χ < χ_0)")
 
-**See:** :doc:`/models/stz/index`, :doc:`/examples/stz/index`
+**See:** :doc:`/models/stz/index`, `STZ examples <https://github.com/imewei/rheojax/tree/main/examples/stz>`__
 
 5. EPM (Elasto-Plastic Models)
 -------------------------------
@@ -555,7 +555,7 @@ where :math:`\chi_0` is the "configurational temperature" and :math:`\chi > \chi
 **Warning:**
    EPM simulation mode is stochastic; each run differs. Use ``seed=42`` for reproducibility.
 
-**See:** :doc:`/models/epm/index`, :doc:`/examples/epm/index`
+**See:** :doc:`/models/epm/index`, `EPM examples <https://github.com/imewei/rheojax/tree/main/examples/epm>`__
 
 Practical Implementation
 ========================

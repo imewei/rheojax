@@ -827,9 +827,9 @@ Further Reading
 
 **RheoJAX Documentation**:
 
-- :doc:`/user_guide/modular_api` - Direct model usage
-- :doc:`/user_guide/pipeline_api` - High-level workflows
-- :doc:`/user_guide/bayesian_inference` - Bayesian model comparison
+- :doc:`/user_guide/04_practical_guides/modular_api` - Direct model usage
+- :doc:`/user_guide/04_practical_guides/pipeline_api` - High-level workflows
+- :doc:`/user_guide/03_advanced_topics/bayesian_inference` - Bayesian model comparison
 - ``examples/model_comparison.ipynb`` - Side-by-side model comparison
 
 Getting Help with Model Selection

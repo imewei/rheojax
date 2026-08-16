@@ -553,7 +553,7 @@ Model Selection Decision Flowchart
 -----------------------------------
 
 For a comprehensive decision flowchart based on your experimental data, see:
-:doc:`/user_guide/model_selection`.
+:doc:`/user_guide/02_model_usage/model_selection`.
 
 **Quick Selection Guide:**
 
@@ -1468,7 +1468,7 @@ Bayesian Inference Support
 
 **Recommended workflow:** NLSQ → NUTS warm-start for 2-5x faster convergence.
 
-See :doc:`/user_guide/bayesian_inference` for comprehensive Bayesian analysis guide.
+See :doc:`/user_guide/03_advanced_topics/bayesian_inference` for comprehensive Bayesian analysis guide.
 
 
 
@@ -1476,9 +1476,8 @@ Next Steps
 ----------
 
 * **Detailed model documentation:** See :doc:`/models/index` for individual model handbooks
-* **Multi-technique fitting:** :doc:`/user_guide/multi_technique_fitting`
-* **Model selection workflow:** :doc:`/user_guide/model_selection`
-* **Compatibility checking:** :doc:`/user_guide/core_concepts` (automatic detection of model-data mismatches)
+* **Multi-technique fitting:** :doc:`/user_guide/03_advanced_topics/multi_technique_fitting`
+* **Model selection workflow:** :doc:`/user_guide/02_model_usage/model_selection`
 * **Giesekus models:** :doc:`/models/giesekus/giesekus` for nonlinear viscoelastic polymer melts and solutions
 * **SGR models:** :doc:`/models/sgr/sgr_conventional` and :doc:`/models/sgr/sgr_generic`
 * **ITT-MCT models:** :doc:`/models/itt_mct/itt_mct_schematic` and :doc:`/models/itt_mct/itt_mct_isotropic` for colloidal glasses

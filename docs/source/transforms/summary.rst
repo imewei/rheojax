@@ -1638,9 +1638,9 @@ Next Steps
 ----------
 
 * **Detailed transform documentation:** :doc:`/transforms/index` for individual transform pages
-* **User guide:** :doc:`/user_guide/transforms` for usage patterns and examples
+* **User guide:** :doc:`/user_guide/03_advanced_topics/transforms_complete` for usage patterns and examples
 * **API reference:** :doc:`/api/transforms` for complete API documentation
 * **Example notebooks:** 13 transform examples in ``examples/transforms/`` directory
-* **Pipeline integration:** :doc:`/user_guide/pipeline_api` for fluent transform chaining
+* **Pipeline integration:** :doc:`/user_guide/04_practical_guides/pipeline_api` for fluent transform chaining
 
 **Need a transform not listed?** Transforms are extensible via ``BaseTransform`` - see :doc:`/developer/contributing`.

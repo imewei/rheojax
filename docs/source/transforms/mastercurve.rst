@@ -205,5 +205,5 @@ See also
   mastercurve preprocessing.
 - :doc:`fft` — provides frequency-domain spectra used as input to Mastercurve.
 - :doc:`mutation_number` — verify thermorheological simplicity before applying TTS.
-- :doc:`../../examples/transforms/02-mastercurve-tts` — tutorial notebook creating
+- `Mastercurve TTS <https://github.com/imewei/rheojax/blob/main/examples/transforms/02-mastercurve-tts.ipynb>`__ — tutorial notebook creating
   mastercurves from TRIOS exports.

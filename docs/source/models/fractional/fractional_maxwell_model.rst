@@ -457,9 +457,9 @@ Related Concepts
 Examples and Guides
 ~~~~~~~~~~~~~~~~~~~
 
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing all fractional families on synthetic and experimental data
-- :doc:`../../examples/model-comparison/01-fractional-family` — systematic comparison using AIC/BIC criteria
-- :doc:`../../user_guide/model_selection` — decision flowcharts for choosing between single-order and two-order models
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — notebook comparing all fractional families on synthetic and experimental data
+- `model-selection examples <https://github.com/imewei/rheojax/tree/main/examples/advanced>`__ — systematic comparison using AIC/BIC criteria
+- :doc:`../../user_guide/02_model_usage/model_selection` — decision flowcharts for choosing between single-order and two-order models
 
 References
 ----------

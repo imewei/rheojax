@@ -364,7 +364,7 @@ See Also
 - :doc:`fractional_kelvin_voigt` — Kelvin arm used inside Burgers
 - :doc:`../../transforms/mastercurve` — build broadband spectra for better fitting
 - :doc:`../../transforms/fft` — convert relaxation to frequency domain
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing Burgers family
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — notebook comparing Burgers family
 
 Material Examples
 -----------------
@@ -554,4 +554,4 @@ See Also
 - :doc:`fractional_kelvin_voigt` — Kelvin arm used inside Burgers
 - :doc:`../../transforms/mastercurve` — build broadband spectra for better fitting
 - :doc:`../../transforms/fft` — convert relaxation to frequency domain
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing Burgers family
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — notebook comparing Burgers family

@@ -1169,7 +1169,7 @@ See Also
 **Related advanced models:**
 
 - :doc:`../stz/stz_conventional` — STZ theory (effective temperature formulation, similar aging physics)
-- :doc:`../fluidity/fluidity_saramito_local` — Fluidity models (phenomenological thixotropy)
+- :doc:`../fluidity/saramito_evp` — Fluidity models (phenomenological thixotropy)
 
 API References
 --------------

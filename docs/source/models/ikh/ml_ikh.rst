@@ -1668,6 +1668,6 @@ See Also
 --------
 
 - :doc:`mikh` — Single-mode thixotropic IKH model (simpler baseline)
-- :doc:`/models/dmt/dmt_local` — Alternative multi-timescale thixotropy approach
-- :doc:`/models/generalized_maxwell` — Multi-mode viscoelasticity (Prony series)
+- :doc:`/models/dmt/dmt` — Alternative multi-timescale thixotropy approach
+- :doc:`/models/multi_mode/generalized_maxwell` — Multi-mode viscoelasticity (Prony series)
 - :doc:`/user_guide/03_advanced_topics/index` — Advanced multi-mode fitting strategies

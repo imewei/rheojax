@@ -460,6 +460,6 @@ All readers raise appropriate exceptions:
 See Also
 --------
 
-- :doc:`../user_guide/io_guide` - Comprehensive I/O guide
+- :doc:`../user_guide/04_practical_guides/data_io` - Comprehensive I/O guide
 - :doc:`core` - RheoData structure
-- :doc:`../user_guide/getting_started` - Quick start examples
+- :doc:`../user_guide/02_model_usage/getting_started` - Quick start examples

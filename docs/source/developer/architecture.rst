@@ -663,7 +663,7 @@ GUI Architecture
 ----------------
 
 The desktop app (``gui/``, ``rheojax-gui``) is built around a single shell,
-the workspace shell. See :doc:`../../architecture-overview` (GUI section) for
+the workspace shell. See ``docs/architecture-overview.md`` (GUI section) for
 the package-layout table; the summary below covers what a contributor needs
 to know before touching it.
 
@@ -715,6 +715,5 @@ See Also
 --------
 
 - :doc:`contributing` - Contribution guidelines
-- :doc:`../user_guide/core_concepts` - Core concepts
 - :doc:`../api_reference` - API documentation
 - `JAX documentation <https://jax.readthedocs.io/>`_ - JAX details

@@ -1,38 +1,59 @@
 # RheoJAX Documentation Structure
 
-**Last Updated:** July 2, 2026
+**Last Updated:** 2026-08-16 (refreshed against `graphify-out/GRAPH_REPORT.md` — 24531 nodes,
+47741 edges, 0 import cycles — and a direct `find docs` sweep)
 
 ## Production Documentation
 
 ```
 docs/
-├── README.md                         # Documentation overview and navigation guide
-├── Makefile                          # Sphinx build commands
-├── .gitignore                        # Excluded files/folders
+├── Makefile                          # Sphinx build commands (SOURCEDIR=source, BUILDDIR=build)
+├── .gitignore                        # Excludes build/, _build/, source/api/generated/
 ├── model-test-mode-compatibility.md  # Model-test mode matrix (53 models)
+├── architecture-overview.md          # Package structure, core abstractions, invariants (hand-maintained)
+├── tech-stack.md                     # Dependency/tooling reference table
 ├── STRUCTURE.md                      # This file
 │
-├── source/                           # Sphinx source files
+├── CODEMAPS/                         # Machine-generated architecture codemaps (ecc:update-codemaps)
+│   ├── architecture.md               # Module graph, dependency direction, entry points
+│   ├── backend.md                    # core/pipeline/cli — CLI command → core call chains
+│   ├── data.md                       # RheoData + io readers/writers, GUI project file, provenance
+│   ├── dependencies.md               # External dependency reference (JAX/NumPyro/PySide6/...)
+│   └── frontend.md                   # gui/ — WorkspaceWindow shell, state, services, jobs
+│
+├── agents/                           # AI-agent workflow docs (referenced from root CLAUDE.md)
+│   ├── domain.md                     # Domain-docs convention (CONTEXT.md + docs/adr/)
+│   ├── issue-tracker.md              # GitHub-issues-as-tracker convention
+│   └── triage-labels.md              # 5-role triage label vocabulary
+│
+├── internal/                         # Working notes, not built into Sphinx
+│   ├── spp_parity_reference.md       # MATLAB SPPplus/R oreo/RheoJAX SPP gap matrix
+│   └── spp_parity_status.md          # SPP golden-parity harness status
+│
+├── verification/                     # Literature/equation verification notes (17 files, not built)
+│   ├── *_equation*.md, *_verification.md, *_literature*.md  — per-family math/citation audits
+│   └── *.rst (2 files: fluidity_saramito_equations.rst, tnt_equations_verification.rst)
+│
+├── examples/
+│   └── README.md                     # Redirect stub — notebooks moved to top-level examples/
+│
+├── source/                           # Sphinx source (built by `make html` / `sphinx-build`)
 │   ├── conf.py                       # Sphinx configuration (Furo theme)
 │   ├── index.rst                     # Documentation home page
 │   ├── quickstart.rst                # 5-minute getting started
 │   ├── installation.rst              # Installation guide
-│   ├── contributing.rst              # Contributing guidelines
 │   ├── api_reference.rst             # API reference entry point
 │   ├── development_status.rst        # Development phases & benchmarks
 │   │
 │   ├── _static/                      # Static assets
 │   │   └── custom.css                # Custom CSS (table striping, typography)
 │   │
-│   ├── _includes/                    # Shared RST fragments (8 files)
-│   │   ├── bayesian_usage_template.rst
+│   ├── _includes/                    # Shared RST fragments, pulled in via `.. include::` (5 files)
 │   │   ├── bayesian_workflow.rst
-│   │   ├── fitting_troubleshooting.rst
 │   │   ├── fractional_seealso.rst
 │   │   ├── glass_transition_physics.rst
 │   │   ├── thixotropy_foundations.rst
-│   │   ├── transient_network_foundations.rst
-│   │   └── validity_linear.rst
+│   │   └── transient_network_foundations.rst
 │   │
 │   ├── _guides/                      # Style guides
 │   │   └── model_documentation_style.rst
@@ -40,16 +61,22 @@ docs/
 │   ├── _templates/                   # Document templates
 │   │   └── model_handbook_template.rst
 │   │
+│   ├── developer/                    # Contributing guides (2 files)
+│   │   ├── contributing.rst          # Contribution guidelines
+│   │   └── architecture.rst          # Package design patterns
+│   │
+│   ├── architecture/                 # 2 files (io_architecture.rst, fitting_transforms_prompt.md)
+│   │
 │   ├── user_guide/                   # Graduate student learning pathway (6 sections)
 │   │   ├── index.rst                 # Learning pathway overview
-│   │   ├── 01_fundamentals/          # Weeks 1-2: Rheology basics (6 files)
-│   │   ├── 02_model_usage/           # Weeks 3-6: Fitting workflows (5 files)
-│   │   ├── 03_advanced_topics/       # Weeks 7-12: Bayesian, fractional, networks (13 files)
-│   │   ├── 04_practical_guides/      # Weeks 13-16: APIs, I/O, batch (9 files)
+│   │   ├── 01_fundamentals/          # Rheology basics (6 files)
+│   │   ├── 02_model_usage/           # Fitting workflows (5 files)
+│   │   ├── 03_advanced_topics/       # Bayesian, fractional, networks (13 files)
+│   │   ├── 04_practical_guides/      # APIs, I/O, batch (9 files)
 │   │   ├── 05_appendices/            # Reference material (5 files)
-│   │   └── 06_gui/                   # GUI reference (9 files)
+│   │   └── 06_gui/                   # GUI reference (11 files)
 │   │
-│   ├── models/                       # Model Handbook — 53 models across 22 families
+│   ├── models/                       # Model Handbook — 53 models across 22 families, 19 directories
 │   │   ├── index.rst                 # Models overview (grouped toctree)
 │   │   ├── summary.rst               # Comparison matrix
 │   │   │
@@ -68,7 +95,7 @@ docs/
 │   │   │
 │   │   │  # Thixotropic & Yield Stress
 │   │   ├── dmt/                      # 2 models: DMTLocal, DMTNonlocal (2 rst)
-│   │   ├── fluidity/                 # 4 models: FluidityLocal/Nonlocal + SaramitoLocal/Nonlocal (4 rst)
+│   │   ├── fluidity/                 # 4 models: FluidityLocal/Nonlocal + SaramitoLocal/Nonlocal (5 rst)
 │   │   ├── hl/                       # 1 model: HebraudLequeux (2 rst)
 │   │   ├── stz/                      # 1 model: STZConventional (2 rst)
 │   │   ├── epm/                      # 2 models: LatticeEPM, TensorialEPM (3 rst)
@@ -94,7 +121,7 @@ docs/
 │   │   ├── fft.rst                   # FFT analysis
 │   │   ├── mastercurve.rst           # Time-temperature superposition
 │   │   ├── mutation_number.rst       # Material classification
-│   │   ├── owchirp.rst              # Fast rheometry
+│   │   ├── owchirp.rst               # Fast rheometry
 │   │   ├── smooth_derivative.rst     # Noise-robust differentiation
 │   │   ├── spp.rst                   # SPP decomposition transform
 │   │   ├── srfs.rst                  # Strain-rate frequency superposition
@@ -104,15 +131,11 @@ docs/
 │   │   └── lve_envelope.rst          # Linear viscoelastic startup envelope
 │   │
 │   ├── api/                          # API Reference (auto-generated, 9 files)
-│   ├── developer/                    # Contributing guides (2 files)
+│   ├── verification/                 # Sphinx-built verification index (1 file: index.rst)
 │   └── examples/                     # Example notebooks overview (1 file)
 │
-├── build/                            # Generated documentation (not in Git)
-│   └── html/                         # Built HTML files
-│
-└── .archive/                         # Working files and reports (not built)
-    ├── README.md                     # Archive guide
-    └── restructuring_2025_11_13/     # November 2025 restructuring
+└── build/                            # Generated documentation — gitignored, not present until built
+    └── html/                         # `make html` output (docs/build/html/index.html)
 ```
 
 ## Documentation Tiers
@@ -122,13 +145,13 @@ docs/
 - **Audience:** Graduate students, new users
 - **Content:** Zero math derivations, pure concepts + worked examples
 - **Sections:** 6 (Fundamentals, Model Usage, Advanced Topics, Practical Guides, Appendices, GUI)
-- **Size:** 47 files across 6 sections
+- **Size:** 50 files across 6 sections
 
 ### Tier 2: Model Handbook (Technical Reference)
 - **Purpose:** Mathematical "what" and "how"
 - **Audience:** Researchers, practitioners
 - **Content:** Full equations, Quick Reference summaries, boxed governing equations
-- **Size:** 86 rst files, 53 models across 22 families
+- **Size:** 87 rst files, 53 models across 22 families
 
 ### Tier 3: Transform Reference (Preprocessing Math)
 - **Purpose:** Data preprocessing theory
@@ -140,31 +163,23 @@ docs/
 ## Building Documentation
 
 ```bash
-cd /Users/b80985/Projects/rheojax
+# From repo root
+uv run sphinx-build -b html docs/source docs/build/html
 
-# Build HTML (from project root)
-uv run sphinx-build -b html docs/source docs/_build
-
-# Or from docs/ directory
+# Or from docs/ (uses Makefile's SOURCEDIR=source, BUILDDIR=build)
 cd docs && make html
 
 # View locally
-open docs/_build/index.html
+open docs/build/html/index.html   # macOS; xdg-open on Linux
 ```
-
-## Archive Files
-
-Working files, reports, and analysis documents are preserved in `.archive/` but excluded from Sphinx builds. See `.archive/README.md` for details.
 
 ## Key Features
 
 - **53 models** across 22 families with full Bayesian inference support
-- **86 rst files** in the Model Handbook (equations, protocols, troubleshooting)
+- **87 rst files** in the Model Handbook (equations, protocols, troubleshooting)
 - **11 transforms** with mathematical derivations
 - **6-section User Guide** structured as a 16-week graduate course
-- **9 learning pathways** for different user backgrounds
-- **218 example notebooks** across all model families
-- **GUI reference** for interactive analysis (PyQt/PySide6)
+- **GUI reference** for interactive analysis (PySide6)
 - **Furo theme** with custom CSS, light/dark modes
 
 ---

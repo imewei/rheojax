@@ -247,7 +247,6 @@ See Also
 - :doc:`/models/stz/index` — STZ: shear transformation zones
 - :doc:`/models/fluidity/index` — Fluidity models for yield stress fluids
 - :doc:`/transforms/srfs` — Strain-rate frequency superposition (SGR analog of TTS)
-- :doc:`/user_guide/soft_glassy_materials` — Introduction to soft glassy rheology
 
 
 References

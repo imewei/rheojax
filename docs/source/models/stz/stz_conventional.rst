@@ -942,8 +942,8 @@ See Also
 
 - :doc:`../sgr/sgr_conventional` — Soft Glassy Rheology (alternative effective temperature model)
 - :doc:`../itt_mct/itt_mct_schematic` — Mode-Coupling Theory (cage-based glass transition)
-- :doc:`../fluidity/fluidity_saramito_local` — Fluidity models (simpler thixotropic framework)
-- :doc:`../dmt/dmt_local` — DMT thixotropic models (structural kinetics approach)
+- :doc:`../fluidity/saramito_evp` — Fluidity models (simpler thixotropic framework)
+- :doc:`../dmt/dmt` — DMT thixotropic models (structural kinetics approach)
 
 **Choosing between STZ and other models:**
 

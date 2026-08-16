@@ -1312,7 +1312,7 @@ See Also
 
 - :doc:`itt_mct_isotropic` --- Full :math:`k`-resolved MCT for quantitative predictions with :math:`S(k)` input
 - :doc:`../sgr/sgr_conventional` --- Alternative glass transition model (trap-based, no :math:`S(k)` required)
-- :doc:`../fluidity/fluidity_saramito_local` --- Simpler thixotropic yield stress model
+- :doc:`../fluidity/saramito_evp` --- Simpler thixotropic yield stress model
 - :doc:`../stz/stz_conventional` --- Shear transformation zone theory (effective temperature approach)
 
 **Choosing between ITT-MCT and SGR:**

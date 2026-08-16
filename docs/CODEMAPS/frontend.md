@@ -1,9 +1,11 @@
-<!-- Generated: 2026-07-18 | Files scanned: ~115 (rheojax/gui) | Token estimate: ~700 -->
+<!-- Generated: 2026-08-16 | Refreshed against graphify-out/GRAPH_REPORT.md | Files scanned: 98
+     (rheojax/gui) | Token estimate: ~700 -->
 
 # GUI (PySide6 desktop app, `rheojax-gui`)
 
 Single-shell app. No web frontend — this replaces the template's "page tree"/"component
-hierarchy" with the Qt widget tree + Redux-style state store.
+hierarchy" with the Qt widget tree + a plain `@dataclass` state tree (NOT Redux — no separate
+store/action/reducer layer; see State section below).
 
 ## Shell
 
@@ -25,13 +27,15 @@ Built by `fit_controller.build_fit_controller(AppState)` /
 `(WorkflowController, [step widgets])`. All three built eagerly in
 `WorkspaceWindow._build_workspace`, not lazily per mode-switch.
 
-## State (Redux-style, `gui/state/` + `gui/foundation/state.py`)
+## State (`gui/foundation/state.py`, dataclass tree — no `gui/state/` package)
 
-`AppState` → `FitState` / `TransformState` / `PipelineState` / `DatasetLibrary` /
-`ActiveJobsState` (`by_id: dict[str, dict]`, tracks in-flight background jobs for
-Close/New/Open confirmation) / `UiState` (theme, mode). `StateStore`/`StateSignals`
-(`gui/state/store.py`, `signals.py`) — granular per-domain Qt signals, not one broad
-`state_changed` fan-out.
+`AppState` (174 edges) holds `library: DatasetLibrary` (193 edges) + `fit: FitState` +
+`transform: TransformState` + `jobs` + `project`, one instance per `WorkspaceWindow`. Controllers
+hold direct references to these dataclasses and pass them by reference to child widgets — there
+is no separate store/action/reducer layer and no per-domain Qt signal bus. Cross-state
+invalidation runs through `foundation/invalidation.py::invalidate_downstream()`: editing an
+earlier wizard step clears dependent downstream fields (`nlsq_result`, `nuts_result`, ...) via a
+static cascade table, and `WorkflowController.on_edit()` re-locks every step after the edited one.
 
 ## Services (`gui/services/`) — GUI's only path to `core`/`pipeline`
 
@@ -56,7 +60,7 @@ matplotlib-backed diagnostic plots (separate from the interactive canvas).
 ## Key Files
 
 - `gui/main.py` — entry point, JAX status probe (deferred via QTimer as of PR #90)
-- `gui/workspace/window.py` — shell, menus, mode/job/theme management (~1400 lines)
+- `gui/workspace/window.py` — shell, menus, mode/job/theme management (1517 lines, `WorkspaceWindow`, 176 edges)
 - `gui/workspace/fit/fit_controller.py`, `transform/transform_controller.py` — wizard assembly
 - `gui/foundation/state.py` — dataclass state tree
 - `gui/foundation/project_codec.py` — project save/load (v2 schema)

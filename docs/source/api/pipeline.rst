@@ -689,8 +689,8 @@ Performance Optimization
 See Also
 --------
 
-- :doc:`/user_guide/pipeline_api` - Comprehensive pipeline tutorial
-- :doc:`/user_guide/modular_api` - Low-level API for custom control
+- :doc:`/user_guide/04_practical_guides/pipeline_api` - Comprehensive pipeline tutorial
+- :doc:`/user_guide/04_practical_guides/modular_api` - Low-level API for custom control
 - :doc:`/api/models` - Model API reference
 - :doc:`/api/transforms` - Transform API reference
 - :class:`rheojax.core.base.BaseModel` - Base model class

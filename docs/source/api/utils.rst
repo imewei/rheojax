@@ -517,7 +517,7 @@ See Also
 --------
 
 - :doc:`core` - Parameter system
-- :doc:`../user_guide/getting_started` - Basic usage examples
+- :doc:`../user_guide/02_model_usage/getting_started` - Basic usage examples
 - `SciPy optimize <https://docs.scipy.org/doc/scipy/reference/optimize.html>`_ - Optimization algorithms
 - `JAX autodiff <https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html>`_ - Automatic differentiation
 
@@ -872,8 +872,8 @@ See Also
 --------
 
 - :doc:`core` - BaseModel integration with check_compatibility parameter
-- :doc:`../user_guide/model_selection` - Comprehensive model selection guide
-- :doc:`../user_guide/getting_started` - Basic usage examples
+- :doc:`../user_guide/02_model_usage/model_selection` - Comprehensive model selection guide
+- :doc:`../user_guide/02_model_usage/getting_started` - Basic usage examples
 
 Data Quality Analysis
 ---------------------
@@ -1078,7 +1078,7 @@ See Also
 --------
 
 - :doc:`core` - BaseModel integration with automatic strategy selection
-- :doc:`../user_guide/getting_started` - Basic fitting examples
+- :doc:`../user_guide/02_model_usage/getting_started` - Basic fitting examples
 - :mod:`rheojax.utils.optimization` - Optimization functions using these strategies
 
 

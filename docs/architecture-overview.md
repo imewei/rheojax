@@ -16,8 +16,7 @@ rheojax/                          # v0.7.1, Python 3.12+
 ├── utils/          # Optimization (NLSQ), Prony, MCT kernels, modulus conversion
 ├── parallel/       # PersistentProcessPool, xdist-aware auto-configuration
 ├── cli/            # CLI entry point (rheojax command)
-├── gui/            # PySide6 desktop application (rheojax-gui)
-└── fitting/        # Fitting engine internals
+└── gui/            # PySide6 desktop application (rheojax-gui)
 ```
 
 ---
@@ -132,7 +131,7 @@ class Maxwell(BaseModel):
 
 ---
 
-## Model Inventory (53 Models, 20 Families)
+## Model Inventory (53 Models, 22 Families)
 
 | Family | Count | Key Pattern | Protocols |
 |--------|-------|-------------|-----------|
@@ -197,7 +196,7 @@ Models handle three input formats:
 
 ---
 
-## Transforms (12)
+## Transforms (11)
 
 | Transform | Purpose |
 |-----------|---------|

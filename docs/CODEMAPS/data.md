@@ -1,4 +1,5 @@
-<!-- Generated: 2026-07-18 | Files scanned: ~30 (core/data + io) | Token estimate: ~500 -->
+<!-- Generated: 2026-08-16 | Refreshed against graphify-out/GRAPH_REPORT.md | Files scanned: ~30
+     (core/data + io) | Token estimate: ~500 -->
 
 # Data Model & I/O (no relational database)
 
@@ -15,10 +16,11 @@ transform path (see architecture.md).
 
 | Format | Reader |
 |---|---|
-| TRIOS (TA Instruments) | `trios.py` |
+| TRIOS (TA Instruments) | `trios/` (`common.py`, `csv.py`, `excel.py`, `json.py`, `txt.py`, `schema/`) |
 | Anton Paar | `anton_paar.py` |
-| CSV / Excel | `csv.py`, `excel.py` |
+| CSV / Excel | `csv_reader.py`, `excel_reader.py` |
 | Auto-detect | `auto.py` → `auto_load()` |
+| Multi-file batch import | `multi_file.py` |
 
 ## Writers (`io/writers/`)
 
