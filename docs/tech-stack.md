@@ -7,7 +7,7 @@
 | Field | Value |
 |-------|-------|
 | **Name** | rheojax |
-| **Version** | 0.7.0 |
+| **Version** | 0.7.1 |
 | **Python** | >=3.12 (supports 3.12, 3.13) |
 | **Build System** | setuptools (>=68.0) + wheel + setuptools-scm |
 | **License** | MIT |
