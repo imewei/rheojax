@@ -5,6 +5,16 @@ All notable changes to RheoJAX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-08-16
+
+### Fixed
+- **Fixed** `rheojax.parallel` worker pool: workers now pin to a specific GPU, crashed workers are detected and respawned automatically, and the pool respects the cgroup CPU quota instead of the host's full core count when sizing itself.
+- **Fixed** 6 additional issues in the worker-pool hardening above, found by a 6-agent PR review pass.
+
+### Changed
+- **Changed** ITT-MCT models: migrated remaining `scipy.integrate.solve_ivp` call sites to `diffrax`, completing the family's move off SciPy ODE solvers.
+- **Changed** synced stale test counts in documentation to the actual `pytest` collection count.
+
 ## [0.7.0] - 2026-08-14
 
 ### Changed
@@ -791,6 +801,7 @@ Refactored the smart initialization system to use the Template Method design pat
 
 Previous releases documented in git history.
 
+[0.7.1]: https://github.com/imewei/rheojax/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/imewei/rheojax/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/imewei/rheojax/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/imewei/rheojax/compare/v0.5.0...v0.6.0

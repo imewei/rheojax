@@ -169,5 +169,5 @@ Working files, reports, and analysis documents are preserved in `.archive/` but 
 
 ---
 
-**Documentation Version:** 0.7.0
+**Documentation Version:** 0.7.1
 **Build Status:** Clean (0 errors, 0 warnings)

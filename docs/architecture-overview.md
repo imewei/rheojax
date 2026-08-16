@@ -5,7 +5,7 @@
 ## Package Structure
 
 ```
-rheojax/                          # v0.7.0, Python 3.12+
+rheojax/                          # v0.7.1, Python 3.12+
 ├── core/           # Foundation: BaseModel, RheoData, Parameter, BayesianMixin, Registry
 ├── models/         # 53 models across 22 families (see Model Inventory)
 ├── transforms/     # 11 transforms (FFT, mastercurve, OWChirp, SPP, Prony, etc.)

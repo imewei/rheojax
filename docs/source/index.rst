@@ -181,7 +181,7 @@ Community and Support
         year = {2024-2026},
         author = {Wei Chen},
         url = {https://github.com/imewei/rheojax},
-        version = {0.7.0}
+        version = {0.7.1}
       }
 
 Indices and Tables
