@@ -29,7 +29,7 @@ Built by `fit_controller.build_fit_controller(AppState)` /
 
 ## State (`gui/foundation/state.py`, dataclass tree — no `gui/state/` package)
 
-`AppState` (176 edges) holds `library: DatasetLibrary` (193 edges) + `fit: FitState` +
+`AppState` (174 edges) holds `library: DatasetLibrary` (193 edges) + `fit: FitState` +
 `transform: TransformState` + `jobs` + `project`, one instance per `WorkspaceWindow`. Controllers
 hold direct references to these dataclasses and pass them by reference to child widgets — there
 is no separate store/action/reducer layer and no per-domain Qt signal bus. Cross-state
