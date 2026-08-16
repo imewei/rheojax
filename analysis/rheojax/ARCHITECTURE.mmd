@@ -1,24 +1,25 @@
+%% Regenerated 2026-08-16 from graphify-out/GRAPH_REPORT.md (24531 nodes, 47741 edges, 0 import cycles detected)
 graph TD
-    subgraph Foundation
-        LOG[logging]
-        CORE[core<br/>RheoData / ParameterSet / FitResult / BayesianResult<br/>FitOrchestrator, Registries]
-        UTILS[utils<br/>optimization, kernels, initialization]
+    subgraph foundation["Foundation"]
+        LOG[logging<br/>structured, leaf util]
+        CORE["core<br/>RheoData 「1440 edges」 / ParameterSet 「459」 / BaseModel 「295」<br/>ModelRegistry 「585」 / FitOrchestrator"]
+        UTILS["utils<br/>nlsq_optimize 「175 edges」, kernels, initialization, safe_import_jax"]
     end
 
-    subgraph Domain_Logic
-        MODELS[models<br/>53 models / 22 families]
+    subgraph domain_logic["Domain Logic"]
+        MODELS["models<br/>53 models / 22 families<br/>e.g. Maxwell 「191 edges」"]
         TRANSFORMS[transforms<br/>11 transforms]
         IO[io<br/>readers / writers]
     end
 
-    subgraph Orchestration
+    subgraph orchestration["Orchestration"]
         PIPE[pipeline<br/>+ parallel]
-        VIZ[visualization<br/>matplotlib]
+        VIZ[visualization<br/>matplotlib, disjoint from GUI canvas]
     end
 
-    subgraph Entry_Points
+    subgraph entry_points["Entry Points"]
         CLI[cli]
-        GUI[gui<br/>services / jobs / workspace]
+        GUI["gui<br/>WorkspaceWindow 「176 edges」 / AppState 「174」<br/>DatasetLibrary 「193」, services / jobs / workspace"]
     end
 
     CORE -.lazy, function-local.-> MODELS
@@ -69,3 +70,14 @@ graph TD
     CLI -.-> LOG
     GUI -.-> LOG
     VIZ -.-> LOG
+
+    style CORE fill:#e7f5ff,stroke:#1971c2
+    style UTILS fill:#e7f5ff,stroke:#1971c2
+    style MODELS fill:#d3f9d8,stroke:#2f9e44
+    style TRANSFORMS fill:#d3f9d8,stroke:#2f9e44
+    style IO fill:#d3f9d8,stroke:#2f9e44
+    style PIPE fill:#e5dbff,stroke:#5f3dc4
+    style VIZ fill:#e5dbff,stroke:#5f3dc4
+    style CLI fill:#ffe8cc,stroke:#d9480f
+    style GUI fill:#ffe8cc,stroke:#d9480f
+    style LOG fill:#f8f9fa,stroke:#868e96
