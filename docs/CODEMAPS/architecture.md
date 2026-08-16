@@ -1,4 +1,5 @@
-<!-- Generated: 2026-07-18 | Files scanned: ~342 source (excl. tests) | Token estimate: ~650 -->
+<!-- Generated: 2026-08-16 | Refreshed against graphify-out/GRAPH_REPORT.md (24531 nodes, 47741
+     edges, 0 import cycles) + direct `find rheojax -name '*.py'` counts | Token estimate: ~650 -->
 
 # RheoJAX Architecture
 
@@ -9,17 +10,22 @@ transforms, NLSQ+Bayesian(NumPyro) dual-track fitting, scikit-learn-style API + 
 
 ```
 rheojax/
-├── core/        (17 src)  BaseModel/BaseTransform, RheoData, Registry, FitOrchestrator, NumPyro builder
-├── models/      (105 src) 53 models / 22 families, lazy __getattr__ registration
-├── transforms/  (12 src)  FFT, mastercurve/TTS-SRFS, SPP decomposition, Prony — eager-imported
-├── io/          (27 src)  TRIOS/Anton Paar/CSV/Excel/HDF5 readers+writers, format auto-detect
-├── pipeline/    (6 src)   Pipeline/BayesianPipeline fluent API, PipelineBuilder, BatchPipeline
-├── cli/         (17 src)  `rheojax`/`rj` entry point: fit/bayesian/spp/pipeline/batch/info
-├── gui/         (115 src) PySide6 desktop app (`rheojax-gui`) — see frontend.md
-├── utils/       (33 src)  Mittag-Leffler, Prony series, NLSQ helpers, uncertainty, init heuristics
-├── parallel/    (4 src)   Process-pool fit/bayesian/batch parallelism
-└── logging/     (6 src)   Structured logging shared by core/cli/gui
+├── core/          (16 src) BaseModel/BaseTransform, RheoData, Registry, FitOrchestrator, NumPyro builder
+├── models/        (105 src) 53 models / 22 families, lazy __getattr__ registration
+├── transforms/    (12 src) FFT, mastercurve/TTS-SRFS, SPP decomposition, Prony — eager-imported
+├── io/            (27 src) TRIOS/Anton Paar/CSV/Excel/HDF5 readers+writers, format auto-detect
+├── pipeline/      (6 src)  Pipeline/BayesianPipeline fluent API, PipelineBuilder, BatchPipeline
+├── cli/           (18 src) `rheojax`/`rj` entry point: fit/bayesian/spp/pipeline/batch/info
+├── gui/           (98 src) PySide6 desktop app (`rheojax-gui`) — see frontend.md
+├── utils/         (38 src) Mittag-Leffler, Prony series, NLSQ helpers, uncertainty, init heuristics
+├── visualization/ (7 src)  Matplotlib static plotting, consumed only by pipeline/base.py
+├── parallel/      (4 src)  Process-pool fit/bayesian/batch parallelism
+└── logging/       (6 src)  Structured logging shared by core/cli/gui
 ```
+
+God nodes (per GRAPH_REPORT.md, by edge count): `RheoData` (1440), `ModelRegistry` (585),
+`ParameterSet` (459), `BaseModel` (295), `safe_import_jax()` (196), `DatasetLibrary` (193),
+`Maxwell` (191), `WorkspaceWindow` (176), `nlsq_optimize()` (175), `AppState` (174).
 
 Dependency direction: everything → `core`. `models`/`transforms` register into `core.Registry` via
 decorators. `pipeline` and `cli` orchestrate `core` + `models`/`transforms`. `gui` calls `core`/

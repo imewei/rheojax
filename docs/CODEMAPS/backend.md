@@ -1,4 +1,6 @@
-<!-- Generated: 2026-07-18 | Files scanned: ~40 (core+pipeline+cli) | Token estimate: ~550 -->
+<!-- Generated: 2026-07-18 | Refreshed 2026-08-16 against graphify-out/GRAPH_REPORT.md (content
+     verified accurate, no changes needed) | Files scanned: ~40 (core+pipeline+cli) | Token
+     estimate: ~550 -->
 
 # Core / Pipeline / CLI ("backend" layer — no HTTP server; library + CLI)
 
