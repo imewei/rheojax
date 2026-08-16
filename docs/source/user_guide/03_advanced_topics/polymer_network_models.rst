@@ -1366,5 +1366,5 @@ Transforms
 Examples
 --------
 
-- :doc:`/examples/tnt/index` — 30 TNT tutorial notebooks
-- :doc:`/examples/vlb/index` — 10 VLB tutorial notebooks
+- `TNT examples <https://github.com/imewei/rheojax/tree/main/examples/tnt>`__ — 30 TNT tutorial notebooks
+- `VLB examples <https://github.com/imewei/rheojax/tree/main/examples/vlb>`__ — 10 VLB tutorial notebooks

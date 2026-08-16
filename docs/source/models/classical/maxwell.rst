@@ -664,7 +664,7 @@ Optimization Algorithm Selection
 **Alternative: Bayesian inference (NUTS)**
    - Use when parameter uncertainty quantification needed
    - Warm-start from NLSQ fit for faster convergence
-   - See :doc:`../../examples/bayesian/01-bayesian-basics`
+   - See `Bayesian Basics <https://github.com/imewei/rheojax/blob/main/examples/bayesian/01-bayesian-basics.ipynb>`__
 
 **Bounds**:
    - :math:`G`: [1e2, 1e8] Pa (adjust based on material)
@@ -960,7 +960,7 @@ See Also
 
 **Examples:**
 
-- :doc:`../../examples/basic/01-maxwell-fitting` — notebook demonstrating parameter estimation and validation
+- `Maxwell Fitting <https://github.com/imewei/rheojax/blob/main/examples/basic/01-maxwell-fitting.ipynb>`__ — notebook demonstrating parameter estimation and validation
 
 **User Guides:**
 

@@ -309,7 +309,7 @@ See Also
 - :doc:`/user_guide/03_advanced_topics/fractional_viscoelasticity_reference` — Mathematical foundations
 - :doc:`/models/sgr/index` — Power-law from disordered structure (SGR approach)
 - :doc:`/transforms/mastercurve` — Time-temperature superposition
-- :doc:`/examples/advanced/04-fractional-models-deep-dive` — Comparison notebook
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — Comparison notebook
 
 
 References

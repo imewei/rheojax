@@ -409,7 +409,7 @@ See Also
 - :doc:`fractional_burgers` — combines fractional Maxwell and Kelvin branches
 - :doc:`../../transforms/mutation_number` — monitor when the solid assumption holds during
   gelation
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — fractional Zener
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — fractional Zener
   comparison notebook
 
 API References
@@ -543,7 +543,7 @@ See also
 - :doc:`fractional_burgers` — combines fractional Maxwell and Kelvin branches.
 - :doc:`../../transforms/mutation_number` — monitor when the solid assumption holds during
   gelation.
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — fractional Zener
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — fractional Zener
   comparison notebook.
 
 References

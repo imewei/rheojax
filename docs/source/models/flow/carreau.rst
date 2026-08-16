@@ -833,7 +833,7 @@ See Also
 - :doc:`power_law` — local approximation of Carreau mid-rate region
 - :doc:`herschel_bulkley` — for yield stress fluids
 - :doc:`../../transforms/mastercurve` — time-temperature superposition for T-dependence
-- :doc:`../../examples/flow/carreau_fitting` — complete fitting tutorial
+- Complete Carreau fitting tutorial (example notebook not yet published)
 
 ----
 

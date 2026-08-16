@@ -606,5 +606,5 @@ Transforms
 Examples
 ~~~~~~~~
 
-- :doc:`../../examples/flow/01-bingham-fitting` — step-by-step Bingham parameter estimation
-- :doc:`../../examples/advanced/02-yield-stress-comparison` — comparing Bingham, HB, and Casson
+- Step-by-step Bingham parameter estimation (example notebook not yet published)
+- `Advanced examples <https://github.com/imewei/rheojax/tree/main/examples/advanced>`__ — comparing Bingham, HB, and Casson

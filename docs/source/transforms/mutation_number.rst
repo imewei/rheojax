@@ -773,5 +773,5 @@ See also
   creep data may be treated as stationary.
 - :doc:`owchirp` — time-resolved LAOS experiments often chain mutation-number analysis.
 - :doc:`smooth_derivative` — derivative estimates feed directly into :math:`\delta(t)`.
-- :doc:`../../examples/transforms/05-mutation-number-analysis` — notebook computing
+- `Mutation Number Analysis <https://github.com/imewei/rheojax/blob/main/examples/transforms/03-mutation-number.ipynb>`__ — notebook computing
   mutation numbers for gelation datasets.

@@ -870,5 +870,5 @@ See also
 - :doc:`../models/flow/herschel_bulkley` — LAOS chirps are often paired with yield-stress
   model identification.
 - :doc:`mutation_number` — evaluate whether chirp segments remain quasi-steady.
-- :doc:`../../examples/transforms/04-owchirp-laos` — notebook demonstrating chirp design,
+- `OWChirp LAOS Analysis <https://github.com/imewei/rheojax/blob/main/examples/transforms/04-owchirp-laos-analysis.ipynb>`__ — notebook demonstrating chirp design,
   playback, and analysis.

@@ -484,7 +484,7 @@ See Also
 - :doc:`fractional_burgers` — combines Maxwell and fractional Kelvin-Voigt in series
 - :doc:`../../transforms/fft` — obtain :math:`G'` and :math:`G''` prior to fitting Jeffreys
   spectra
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — notebook comparing
   Jeffreys, Burgers, and Maxwell families
 
 API References
@@ -697,7 +697,7 @@ See also
 - :doc:`fractional_burgers` — combines Maxwell and fractional Kelvin-Voigt in series.
 - :doc:`../../transforms/fft` — obtain :math:`G'` and :math:`G''` prior to fitting Jeffreys
   spectra.
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — notebook comparing
   Jeffreys, Burgers, and Maxwell families.
 
 References

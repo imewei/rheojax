@@ -154,5 +154,5 @@ See also
   :math:`G'(\omega)` and :math:`G''(\omega)`.
 - :doc:`../transforms/mutation_number` — derivative estimates feed the mutation-number
   metric for gelation diagnostics.
-- :doc:`../examples/transforms/01-torque-to-stress` — notebook demonstrating practical
+- `Smooth Derivative <https://github.com/imewei/rheojax/blob/main/examples/transforms/05-smooth-derivative.ipynb>`__ — notebook demonstrating practical
   parameter settings for :class:`SmoothDerivative`.

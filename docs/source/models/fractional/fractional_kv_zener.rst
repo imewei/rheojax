@@ -446,7 +446,7 @@ See Also
 - :doc:`fractional_maxwell_model` — most general two-order series formulation
 - :doc:`../../transforms/mastercurve` — align creep spectra across temperature before FKZ
   fitting
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — comparisons of Zener
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — comparisons of Zener
   variants across datasets
 
 API References
@@ -611,7 +611,7 @@ See also
 - :doc:`fractional_maxwell_model` — most general two-order series formulation.
 - :doc:`../../transforms/mastercurve` — align creep spectra across temperature before FKZ
   fitting.
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — comparisons of Zener
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — comparisons of Zener
   variants across datasets.
 
 References

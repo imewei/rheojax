@@ -448,7 +448,7 @@ Further Reading
 
 - :doc:`/user_guide/02_model_usage/model_selection` — Decision flowcharts for choosing fractional vs classical models
 - :doc:`/developer/architecture` — Template Method pattern for smart initialization
-- :doc:`/examples/advanced/04-fractional-models-deep-dive` — Jupyter notebook with case studies
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — Jupyter notebook with case studies
 
 **External Resources:**
 

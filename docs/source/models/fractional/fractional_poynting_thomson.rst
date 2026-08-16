@@ -482,7 +482,7 @@ See Also
   retardation spectra
 - :doc:`../../transforms/fft` — necessary to obtain :math:`G'(\omega)` before fitting
   relaxation data
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — demonstrates how
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — demonstrates how
   Poynting–Thomson fits compare to other fractional elements
 
 API References
@@ -680,7 +680,7 @@ See also
   retardation spectra.
 - :doc:`../../transforms/fft` — necessary to obtain :math:`G'(\omega)` before fitting
   relaxation data.
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — demonstrates how
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — demonstrates how
   Poynting–Thomson fits compare to other fractional elements.
 
 References

@@ -868,7 +868,7 @@ Optimization Algorithm Selection
    - **Highly recommended** for Zener to quantify parameter uncertainty
    - :math:`G_s` and :math:`G_p` can be **correlated** → credible intervals important
    - Warm-start from NLSQ for faster convergence
-   - See :doc:`../../examples/bayesian/01-bayesian-basics`
+   - See `Bayesian Basics <https://github.com/imewei/rheojax/blob/main/examples/bayesian/01-bayesian-basics.ipynb>`__
 
 **Bounds** (adjust based on material class):
    - :math:`G_s`: [1e2, 1e10] Pa
@@ -1202,7 +1202,7 @@ See Also
 
 **Examples:**
 
-- :doc:`../../examples/basic/02-zener-creep` — notebook that estimates :math:`G_s`, :math:`G_p`, and :math:`\eta_p` from creep-recovery experiments
+- `Zener Fitting <https://github.com/imewei/rheojax/blob/main/examples/basic/02-zener-fitting.ipynb>`__ — notebook that estimates :math:`G_s`, :math:`G_p`, and :math:`\eta_p` from creep-recovery experiments
 
 **User Guides:**
 

@@ -501,7 +501,7 @@ See Also
 - :doc:`../flow/carreau` — pair liquid-like viscoelastic spectra with steady-flow fits
 - :doc:`../../transforms/owchirp` — fast acquisition of broadband :math:`G^*` for Zener
   fitting
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — worked comparisons of
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — worked comparisons of
   all fractional Zener forms
 
 API References
@@ -745,7 +745,7 @@ See also
 - :doc:`../flow/carreau` — pair liquid-like viscoelastic spectra with steady-flow fits.
 - :doc:`../../transforms/owchirp` — fast acquisition of broadband :math:`G^*` for Zener
   fitting.
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — worked comparisons of
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — worked comparisons of
   all fractional Zener forms.
 
 References

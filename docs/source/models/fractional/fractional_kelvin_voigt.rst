@@ -179,7 +179,7 @@ See Also
 - :doc:`../flow/bingham` — combine bounded creep solids with yield-stress flow models
 - :doc:`../../transforms/mutation_number` — monitor whether the quasi-solid assumption
   holds during gelation
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — notebook comparing
   Kelvin-Voigt, Maxwell, and Zener fractional families
 
 Governing Equations
@@ -379,7 +379,7 @@ See also
 - :doc:`../flow/bingham` — combine bounded creep solids with yield-stress flow models.
 - :doc:`../../transforms/mutation_number` — monitor whether the quasi-solid assumption
   holds during gelation.
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — notebook comparing
   Kelvin-Voigt, Maxwell, and Zener fractional families.
 
 References

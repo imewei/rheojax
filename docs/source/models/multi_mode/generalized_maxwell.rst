@@ -1858,8 +1858,8 @@ See Also
 - :doc:`../classical/zener` — Adds equilibrium spring for solids
 - :doc:`../fractional/fractional_maxwell_liquid` — Continuous spectrum via fractional calculus
 - :doc:`../../transforms/mastercurve` — Time-temperature superposition (automatic shift factors)
-- :doc:`../../examples/advanced/08-generalized_maxwell_fitting` — Complete GMM workflow notebook
-- :doc:`../../examples/bayesian/07-gmm_bayesian_workflow` — Bayesian inference with prior safety
+- `Generalized Maxwell Fitting <https://github.com/imewei/rheojax/blob/main/examples/advanced/08-generalized_maxwell_fitting.ipynb>`__ — Complete GMM workflow notebook
+- `GMM Bayesian Workflow <https://github.com/imewei/rheojax/blob/main/examples/bayesian/07-gmm_bayesian_workflow.ipynb>`__ — Bayesian inference with prior safety
 - :doc:`../../user_guide/02_model_usage/model_selection` — Decision flowcharts for model selection
 
 References

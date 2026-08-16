@@ -716,8 +716,8 @@ See Also
 
 **Examples:**
 
-- :doc:`../../examples/advanced/04-fractional-models-deep-dive` — notebook comparing all fractional families
-- :doc:`../../examples/basic/03-springpot-fitting` — step-by-step SpringPot parameter estimation
+- `Fractional Models Deep Dive <https://github.com/imewei/rheojax/blob/main/examples/advanced/04-fractional-models-deep-dive.ipynb>`__ — notebook comparing all fractional families
+- `SpringPot Fitting <https://github.com/imewei/rheojax/blob/main/examples/basic/03-springpot-fitting.ipynb>`__ — step-by-step SpringPot parameter estimation
 
 **User Guides:**
 

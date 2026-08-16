@@ -780,5 +780,5 @@ See also
   FFT enable fractional-order identification.
 - :doc:`mastercurve` — combine FFT-derived spectra across temperature before fitting.
 - :doc:`owchirp` — chirp experiments are often FFT processed using the same pipeline.
-- :doc:`../../examples/transforms/01-fft-time-to-frequency` — notebook showing a full
+- `FFT Analysis <https://github.com/imewei/rheojax/blob/main/examples/transforms/01-fft-analysis.ipynb>`__ — notebook showing a full
   FFT preprocessing workflow.
